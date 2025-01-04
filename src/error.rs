@@ -14,20 +14,33 @@
 // You should have received a copy of the GNU Affero General Public License along with fvr. If not,
 // see <https://www.gnu.org/licenses/>.
 
-//! An implementation of the `ls` command-line application.
+//! Defines crate-specific errors.
 
-// Panic prevention
-#![deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
-#![cfg_attr(debug_assertions, warn(clippy::todo, clippy::unimplemented))]
-#![cfg_attr(not(debug_assertions), deny(clippy::todo, clippy::unimplemented))]
-// Safety checks
-#![deny(unsafe_code, clippy::missing_safety_doc, clippy::undocumented_unsafe_blocks)]
-// General lints
-#![warn(clippy::cargo, clippy::nursery, clippy::pedantic, missing_docs)]
-// Feature gates
-#![feature(slice_split_once)]
+/// Provides an alias for a [`Result<T, E>`][0] with its error type defaulted to [`Error`][1].
+///
+/// [0]: core::result::Result
+/// [1]: crate::Error
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
-pub mod arguments;
-pub mod error;
+/// A possible error encountered during this command's execution.
+#[derive(Debug)]
+pub enum Error {
+    /// An IO error.
+    Io(std::io::Error),
+}
 
-const fn main() {}
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(error) => error.fmt(f),
+        }
+    }
+}

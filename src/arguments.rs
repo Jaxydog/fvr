@@ -14,20 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with fvr. If not,
 // see <https://www.gnu.org/licenses/>.
 
-//! An implementation of the `ls` command-line application.
+//! Provides the command's arguments and implements a method for parsing them.
 
-// Panic prevention
-#![deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
-#![cfg_attr(debug_assertions, warn(clippy::todo, clippy::unimplemented))]
-#![cfg_attr(not(debug_assertions), deny(clippy::todo, clippy::unimplemented))]
-// Safety checks
-#![deny(unsafe_code, clippy::missing_safety_doc, clippy::undocumented_unsafe_blocks)]
-// General lints
-#![warn(clippy::cargo, clippy::nursery, clippy::pedantic, missing_docs)]
-// Feature gates
-#![feature(slice_split_once)]
-
-pub mod arguments;
-pub mod error;
-
-const fn main() {}
+pub mod parse;

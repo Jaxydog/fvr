@@ -29,5 +29,6 @@ readme = "README.md"
 repository = "https://github.com/Jaxydog/fvr"
 
 [dependencies]
+thiserror = "~2.0"
 
 [target.'cfg(unix)'.dependencies]
