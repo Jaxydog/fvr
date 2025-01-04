@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Copyright © 2025 Jaxydog
+#
+# This file is part of fvr.
+#
+# fvr is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+# License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# fvr is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with fvr. If not,
+# see <https://www.gnu.org/licenses/>.
+
+name: Rust
+
+on:
+    push:
+        paths:
+            - '**.rs'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+    pull_request:
+        paths:
+            - '**.rs'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    run:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/cache@v4
+              with:
+                path: |
+                    ~/.cargo/bin/
+                    ~/.cargo/registry/cache/
+                    ~/.cargo/registry/index/
+                    ~/.cargo/git/db/
+                    ./target/
+                key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+            - name: Setup - Install Clippy
+              run: rustup component add clippy
+            - name: Setup - Install RustFmt
+              run: rustup component add rustfmt
+
+            - name: Action - Compile
+              run: cargo build --verbose
+            - name: Action - Lint
+              run: cargo clippy --verbose
+            - name: Action - Format
+              run: cargo fmt --all -- --check
