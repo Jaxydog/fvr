@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 
+# Copyright © 2025 Jaxydog
+# 
+# This file is part of fvr.
+# 
+# fvr is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+# 
+# fvr is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+# 
+# You should have received a copy of the GNU Affero General Public License along with fvr. If not,
+# see <https://www.gnu.org/licenses/>.
+
+edition = "2021"
+max_width = 120
+merge_derives = false
+newline_style = "Unix"
+remove_nested_parens = true
+reorder_imports = true
+reorder_modules = true
+use_field_init_shorthand = true
+use_small_heuristics = "Max"
+use_try_shorthand = true
