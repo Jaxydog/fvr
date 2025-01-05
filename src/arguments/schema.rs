@@ -19,6 +19,7 @@
 use std::io::Write;
 
 /// Defines a command outline.
+#[must_use]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Command<'s> {
     /// The command's name.
@@ -35,7 +36,40 @@ pub struct Command<'s> {
     pub sub_commands: Option<&'s [Command<'s>]>,
 }
 
-impl Command<'_> {
+impl<'s> Command<'s> {
+    /// Creates a new [`Command`].
+    pub const fn new(name: &'s str, about: &'s str) -> Self {
+        Self { name, about, version: None, positionals: None, arguments: None, sub_commands: None }
+    }
+
+    /// Sets this command's version.
+    pub const fn version(mut self, version: &'s str) -> Self {
+        self.version = Some(version);
+
+        self
+    }
+
+    /// Sets this command's positional arguments.
+    pub const fn positionals(mut self, positionals: &'s [Value<'s>]) -> Self {
+        self.positionals = Some(positionals);
+
+        self
+    }
+
+    /// Sets this command's arguments.
+    pub const fn arguments(mut self, arguments: &'s [Argument<'s>]) -> Self {
+        self.arguments = Some(arguments);
+
+        self
+    }
+
+    /// Sets this command's sub-commands.
+    pub const fn sub_commands(mut self, sub_commands: &'s [Self]) -> Self {
+        self.sub_commands = Some(sub_commands);
+
+        self
+    }
+
     /// Writes the command's outline to the given writer.
     ///
     /// # Errors
@@ -217,6 +251,7 @@ impl Command<'_> {
 }
 
 /// Defines an argument outline.
+#[must_use]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Argument<'s> {
     /// The argument's long name.
@@ -229,7 +264,26 @@ pub struct Argument<'s> {
     pub value: Option<Value<'s>>,
 }
 
-impl Argument<'_> {
+impl<'s> Argument<'s> {
+    /// Creates a new [`Argument`].
+    pub const fn new(long: &'s str, about: &'s str) -> Self {
+        Self { long, short: None, about, value: None }
+    }
+
+    /// Sets this argument's short name.
+    pub const fn short(mut self, short: char) -> Self {
+        self.short = Some(short);
+
+        self
+    }
+
+    /// Sets this argument's value.
+    pub const fn value(mut self, value: Value<'s>) -> Self {
+        self.value = Some(value);
+
+        self
+    }
+
     /// Asserts that this argument is valid and may be used within a command-line application.
     ///
     /// # Panics
@@ -253,6 +307,7 @@ impl Argument<'_> {
 }
 
 /// Defines a value outline.
+#[must_use]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Value<'s> {
     /// The value's name.
@@ -269,7 +324,47 @@ pub struct Value<'s> {
     pub options: Option<&'s [&'s str]>,
 }
 
-impl Value<'_> {
+impl<'s> Value<'s> {
+    /// Creates a new [`Value`].
+    pub const fn new(name: &'s str) -> Self {
+        Self { name, about: None, list: false, required: false, default: None, options: None }
+    }
+
+    /// Sets this value's description.
+    pub const fn about(mut self, about: &'s str) -> Self {
+        self.about = Some(about);
+
+        self
+    }
+
+    /// Sets this value as a list of values.
+    pub const fn list(mut self) -> Self {
+        self.list = true;
+
+        self
+    }
+
+    /// Sets this value as being required.
+    pub const fn required(mut self) -> Self {
+        self.required = true;
+
+        self
+    }
+
+    /// Sets this value's default value.
+    pub const fn default(mut self, default: &'s str) -> Self {
+        self.default = Some(default);
+
+        self
+    }
+
+    /// Sets this value's options.
+    pub const fn options(mut self, options: &'s [&'s str]) -> Self {
+        self.options = Some(options);
+
+        self
+    }
+
     /// Asserts that this value is valid and may be used within a command-line application.
     ///
     /// # Panics

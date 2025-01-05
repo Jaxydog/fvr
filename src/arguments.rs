@@ -31,69 +31,25 @@ pub mod parse;
 pub mod schema;
 
 /// Defines the command's outline.
-pub const SCHEMA: self::schema::Command<'_> = {
+pub const SCHEMA: self::schema::Command<'static> = {
     use self::schema::{Argument, Command, Value};
 
-    Command {
-        name: env!("CARGO_BIN_NAME"),
-        about: env!("CARGO_PKG_DESCRIPTION"),
-        version: Some(env!("CARGO_PKG_VERSION")),
-        positionals: Some(&[Value {
-            name: "PATHS",
-            about: Some("The file paths to list"),
-            list: true,
-            required: false,
-            default: Some("."),
-            options: None,
-        }]),
-        arguments: Some(&[
-            Argument { long: "help", short: Some('h'), about: "Shows the command's usage", value: None },
-            Argument { long: "version", short: Some('V'), about: "Shows the command's version", value: None },
-            Argument {
-                long: "color",
-                short: None,
-                about: "Determines whether to use color",
-                value: Some(Value {
-                    name: "CHOICE",
-                    about: None,
-                    list: false,
-                    required: true,
-                    default: Some("auto"),
-                    options: Some(&["auto", "always", "never"]),
-                }),
-            },
-        ]),
-        sub_commands: Some(&[Command {
-            name: "tree",
-            about: "List the contents of directories in a tree view",
-            version: None,
-            positionals: Some(&[Value {
-                name: "PATHS",
-                about: Some("The file paths to list"),
-                list: true,
-                required: false,
-                default: Some("."),
-                options: None,
-            }]),
-            arguments: Some(&[
-                Argument { long: "help", short: Some('h'), about: "Shows the command's usage", value: None },
-                Argument {
-                    long: "color",
-                    short: None,
-                    about: "Determines whether to use color",
-                    value: Some(Value {
-                        name: "CHOICE",
-                        about: None,
-                        list: false,
-                        required: true,
-                        default: Some("auto"),
-                        options: Some(&["auto", "always", "never"]),
-                    }),
-                },
-            ]),
-            sub_commands: None,
-        }]),
-    }
+    Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
+        .arguments(&[
+            Argument::new("help", "Shows the command's usage").short('h'),
+            Argument::new("version", "Shows the command's version").short('V'),
+            Argument::new("color", "Determines whether to output with color")
+                .value(Value::new("CHOICE").required().default("auto").options(&["auto", "always", "never"])),
+        ])
+        .sub_commands(&[Command::new("tree", "List the contents of directories in a tree-based view")
+            .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
+            .arguments(&[
+                Argument::new("help", "Shows the command's usage").short('h'),
+                Argument::new("color", "Determines whether to output with color")
+                    .value(Value::new("CHOICE").required().default("auto").options(&["auto", "always", "never"])),
+            ])])
 };
 
 /// A result of trying to parse the application's command-line arguments.
