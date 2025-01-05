@@ -27,7 +27,26 @@
 // Feature gates
 #![feature(slice_split_once)]
 
+use std::process::ExitCode;
+
 pub mod arguments;
 pub mod error;
 
-const fn main() {}
+/// Defines the application's constant exit codes.
+pub mod exit_codes {
+    /// The program ran successfully.
+    pub const SUCCESS: u8 = 0;
+    /// A generic error was encountered.
+    pub const ERROR_GENERIC: u8 = 1;
+    /// An invalid argument or number of arguments were provided.
+    pub const ERROR_CLI_USAGE: u8 = 2;
+}
+
+fn main() -> ExitCode {
+    let _arguments = match self::arguments::parse_args() {
+        arguments::ParseResult::Ok(arguments) => dbg!(arguments),
+        arguments::ParseResult::Exit(code) => return ExitCode::from(code),
+    };
+
+    ExitCode::SUCCESS
+}

@@ -77,14 +77,16 @@ impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
     ///
     /// [0]: crate::arguments::parse::Parser
     pub fn next_argument(&mut self) -> Result<Option<Argument<A>>, Error<A>> {
-        if matches!(
+        if !matches!(
             self.state,
             ParserState::Start { arguments_closed: true } | ParserState::Finished { arguments_closed: true }
         ) {
-            return self.next_positional().map(|v| v.map(Argument::Positional));
+            if let Ok(Some(argument)) = self.next_parameter() {
+                return Ok(Some(argument.into()));
+            }
         }
 
-        self.next_parameter().map(|v| v.map(Into::into))
+        self.next_positional().map(|v| v.map(Argument::Positional))
     }
 
     /// Returns the next positional argument of this [`Parser<A, I>`][0].
