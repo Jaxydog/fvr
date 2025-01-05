@@ -31,6 +31,7 @@ use std::process::ExitCode;
 
 pub mod arguments;
 pub mod error;
+pub mod files;
 
 /// Defines the application's constant exit codes.
 pub mod exit_codes {
@@ -44,7 +45,7 @@ pub mod exit_codes {
 
 fn main() -> ExitCode {
     let _arguments = match self::arguments::parse_args() {
-        arguments::ParseResult::Ok(arguments) => dbg!(arguments),
+        arguments::ParseResult::Ok(arguments) => arguments,
         arguments::ParseResult::Exit(code) => return ExitCode::from(code),
     };
 

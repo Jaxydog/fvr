@@ -23,9 +23,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use parse::Argument;
-
-use self::parse::Parser;
+use self::parse::{Argument, Parser};
 
 pub mod parse;
 pub mod schema;
