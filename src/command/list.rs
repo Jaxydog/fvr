@@ -42,11 +42,15 @@ pub fn invoke(arguments: &Arguments, list_arguments: &ListArguments) -> std::io:
 
     let f = &mut std::io::stdout().lock();
 
-    for path in list_arguments.paths.get() {
+    for (index, path) in list_arguments.paths.get().enumerate() {
         if list_arguments.paths.len() > 1 {
+            if index > 0 {
+                f.write_all(b"\n")?;
+            }
+
             Name::new(path, false).show(arguments, f)?;
 
-            f.write_all(b":")?;
+            f.write_all(b":\n")?;
         }
 
         crate::files::visit_directory(path, sorter, filter, |path, _remaining| {

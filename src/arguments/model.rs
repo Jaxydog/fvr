@@ -17,7 +17,6 @@
 //! Defines the command's argument data types.
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::path::Path;
 
 /// A function used to sort entries.
@@ -166,19 +165,23 @@ pub struct TreeArguments {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Paths {
     /// The inner set of paths.
-    inner: HashSet<Box<Path>>,
+    inner: Vec<Box<Path>>,
 }
 
 impl Paths {
     /// Creates a new [`Paths`].
     #[must_use]
-    pub fn new() -> Self {
-        Self { inner: HashSet::new() }
+    pub const fn new() -> Self {
+        Self { inner: Vec::new() }
     }
 
     /// Adds the given path to the list.
     pub fn add(&mut self, path: impl AsRef<Path>) {
-        self.inner.insert(path.as_ref().into());
+        let path = Box::from(path.as_ref());
+
+        if !self.inner.contains(&path) {
+            self.inner.push(path);
+        }
     }
 
     /// Returns an iterator of the inner paths.
