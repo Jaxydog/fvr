@@ -14,33 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License along with fvr. If not,
 // see <https://www.gnu.org/licenses/>.
 
-//! Defines crate-specific errors.
+//! Implements the tree sub-command.
 
-/// Provides an alias for a [`Result<T, E>`][0] with its error type defaulted to [`Error`][1].
+use crate::arguments::model::{Arguments, TreeArguments};
+
+/// Runs the command.
 ///
-/// [0]: core::result::Result
-/// [1]: crate::Error
-pub type Result<T, E = Error> = core::result::Result<T, E>;
-
-/// A possible error encountered during this command's execution.
-#[derive(Debug)]
-pub enum Error {
-    /// An IO error.
-    Io(std::io::Error),
-}
-
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        Self::Io(value)
-    }
-}
-
-impl core::error::Error for Error {}
-
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Io(error) => error.fmt(f),
-        }
-    }
+/// # Errors
+///
+/// This function will return an error if the command fails.
+pub const fn invoke(_arguments: &Arguments, _list_arguments: &TreeArguments) -> std::io::Result<()> {
+    Ok(())
 }

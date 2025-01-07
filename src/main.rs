@@ -25,13 +25,23 @@
 // General lints
 #![warn(clippy::cargo, clippy::nursery, clippy::pedantic, missing_docs)]
 // Feature gates
-#![feature(slice_split_once)]
+#![feature(can_vector, slice_split_once, try_trait_v2, write_all_vectored)]
 
 use std::process::ExitCode;
 
+use arguments::model::SubCommand;
+
+use self::arguments::ParseResult;
+
 pub mod arguments;
-pub mod error;
+pub mod display;
 pub mod files;
+
+/// Defines sub-command implementations.
+pub mod command {
+    pub mod list;
+    pub mod tree;
+}
 
 /// Defines the application's constant exit codes.
 pub mod exit_codes {
@@ -44,10 +54,20 @@ pub mod exit_codes {
 }
 
 fn main() -> ExitCode {
-    let _arguments = match self::arguments::parse_args() {
-        arguments::ParseResult::Ok(arguments) => arguments,
-        arguments::ParseResult::Exit(code) => return ExitCode::from(code),
+    let arguments = match self::arguments::parse_arguments() {
+        ParseResult::Ok(arguments) => arguments,
+        ParseResult::Exit(code) => return ExitCode::from(code),
     };
 
-    ExitCode::SUCCESS
+    if let Err(error) = match arguments.command.as_ref() {
+        None => unreachable!(),
+        Some(SubCommand::List(list_arguments)) => self::command::list::invoke(&arguments, list_arguments),
+        Some(SubCommand::Tree(tree_arguments)) => self::command::tree::invoke(&arguments, tree_arguments),
+    } {
+        eprintln!("{error}");
+
+        return ExitCode::from(self::exit_codes::ERROR_GENERIC);
+    };
+
+    ExitCode::from(self::exit_codes::SUCCESS)
 }
