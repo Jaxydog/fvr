@@ -20,10 +20,8 @@
 //!
 //! [0]: https://github.com/j-tai/getargs
 
-use std::{
-    ffi::OsStr,
-    fmt::{Debug, Display, Formatter},
-};
+use std::ffi::OsStr;
+use std::fmt::{Debug, Display, Formatter};
 
 /// An error that may be returned while parsing command-line arguments.
 #[derive(Debug, thiserror::Error)]
@@ -324,7 +322,7 @@ impl ArgumentLike for &'_ str {
 
     #[inline]
     fn as_short_argument(self) -> Option<(Self::Short, Option<Self>)> {
-        self.chars().next().map(|c| (c, Some(&self[c.len_utf8()..]).filter(|s| !s.is_empty())))
+        self.chars().next().map(|c| (c, Some(&self[c.len_utf8() ..]).filter(|s| !s.is_empty())))
     }
 }
 
@@ -349,7 +347,7 @@ impl<'s> ArgumentLike for &'s [u8] {
         self.utf8_chunks().next().map(|c| {
             let len = c.valid().len() + c.invalid().len();
 
-            (&self[0..len], Some(&self[len..]).filter(|s| !s.is_empty()))
+            (&self[0 .. len], Some(&self[len ..]).filter(|s| !s.is_empty()))
         })
     }
 }
