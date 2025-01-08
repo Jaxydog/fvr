@@ -57,8 +57,8 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let f = &mut std::io::stdout().lock();
 
     for (index, path) in list_arguments.paths.get().enumerate() {
-        let remaining = list_arguments.paths.len() - index;
-        let root_entry = ShowData { path, data: None, remaining, depth: None };
+        let count = list_arguments.paths.len();
+        let root_entry = ShowData { path, data: None, index, count, depth: None };
 
         if list_arguments.paths.len() > 1 {
             if index > 0 {
@@ -70,8 +70,8 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
             f.write_all(b":\n")?;
         }
 
-        crate::files::visit(path, &filter, &sorter, |path, data, remaining| {
-            let entry = ShowData { path, data: Some(data), remaining, depth: None };
+        crate::files::visit(path, &filter, &sorter, |path, data, index, count| {
+            let entry = ShowData { path, data: Some(data), index, count, depth: None };
 
             displays.show(arguments, f, entry).and_then(|()| f.write_all(b"\n"))
         })?;

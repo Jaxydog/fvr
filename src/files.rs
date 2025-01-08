@@ -31,8 +31,8 @@ pub mod sort;
 
 /// Iterates over the file system, calling the given function for each entry.
 ///
-/// The given closure accepts three arguments; the file path, its metadata, and the estimated amount of remaining
-/// entries.
+/// The given closure accepts four arguments; the file path, its metadata, the current entry index, and the estimated
+/// amount of total entries.
 ///
 /// # Errors
 ///
@@ -42,7 +42,7 @@ where
     P: AsRef<Path>,
     F: Filter,
     S: Sort,
-    V: FnMut(&Path, &Metadata, usize) -> Result<()>,
+    V: FnMut(&Path, &Metadata, usize, usize) -> Result<()>,
 {
     let mut collection = std::fs::read_dir(path.as_ref())?
         .map(|v| v.and_then(|v| Ok((v.path(), v.metadata()?))))
@@ -51,43 +51,34 @@ where
 
     collection.sort_unstable_by(|(l_path, l_data), (r_path, r_data)| sort.sort((l_path, l_data), (r_path, r_data)));
 
-    collection.iter().enumerate().try_for_each(|(index, (path, data))| visit(path, data, collection.len() - index))
+    collection.iter().enumerate().try_for_each(|(index, (path, data))| visit(path, data, index, collection.len()))
 }
 
 /// Iterates over the file system recursively, calling the given function for each entry.
 ///
-/// The given closure accepts four arguments; the file path, its metadata, the estimated amount of remaining entries,
-/// and the current depth from the starting path.
+/// The given closure accepts four arguments; the file path, its metadata, the current entry index, the estimated amount
+/// of total entries, and the current depth from the starting path.
 ///
 /// # Errors
 ///
 /// This function will return an error if iteration fails for any reason.
-pub fn visit_recursive<P, S, F, V>(path: P, filter: &F, sort: &S, visit: V) -> Result<()>
+pub fn visit_recursive<P, S, F, V>(path: P, filter: &F, sort: &S, depth: usize, visit: &mut V) -> Result<()>
 where
     P: AsRef<Path>,
     F: Filter,
     S: Sort,
-    V: FnMut(&Path, &Metadata, usize, usize) -> Result<()>,
+    V: FnMut(&Path, &Metadata, usize, usize, usize) -> Result<()>,
 {
-    #[inline]
-    fn recurse<P, S, F, V>(path: P, filter: &F, sort: &S, mut visit: V, depth: usize) -> Result<()>
-    where
-        P: AsRef<Path>,
-        F: Filter,
-        S: Sort,
-        V: FnMut(&Path, &Metadata, usize, usize) -> Result<()>,
-    {
-        self::visit(
-            &path,
-            &self::filter::by(|path, data| filter.depth_filter(path, data, depth)),
-            &self::sort::by(|lhs, rhs| sort.depth_sort(lhs, rhs, depth)),
-            |path, data, remaining| visit(path, data, remaining, depth),
-        )?;
+    self::visit(
+        path,
+        &self::filter::by(|path, data| filter.depth_filter(path, data, depth)),
+        &self::sort::by(|lhs, rhs| sort.depth_sort(lhs, rhs, depth)),
+        move |path, data, index, count| {
+            visit(path, data, index, count, depth)?;
 
-        recurse(path, filter, sort, visit, depth.saturating_add(1))
-    }
-
-    recurse(path, filter, sort, visit, 0)
+            if data.is_dir() { self::visit_recursive(path, filter, sort, depth + 1, visit) } else { Ok(()) }
+        },
+    )
 }
 
 /// Returns `true` if the given path is considered 'hidden'.

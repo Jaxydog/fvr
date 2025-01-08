@@ -35,8 +35,10 @@ pub struct ShowData<'p> {
     pub path: &'p Path,
     /// The entry metadata, if available.
     pub data: Option<&'p Metadata>,
-    /// The remaining number of entries.
-    pub remaining: usize,
+    /// The current entry's index.
+    pub index: usize,
+    /// The total number of entries.
+    pub count: usize,
     /// The current depth, if this is used in a recursive call.
     pub depth: Option<usize>,
 }
@@ -60,6 +62,7 @@ pub trait Show {
             ColorChoice::Always => self.show_color(arguments, f, entry),
             ColorChoice::Never => self.show_plain(arguments, f, entry),
         }
+        .and_then(|()| f.write_all(b" "))
     }
 
     /// Outputs this value into the given output stream with no color.
@@ -79,11 +82,11 @@ pub trait Show {
 
 impl Show for [&dyn Show] {
     fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_plain(arguments, f, entry).and_then(|()| f.write_all(b" ")))
+        self.iter().try_for_each(|show| show.show_plain(arguments, f, entry))
     }
 
     fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_color(arguments, f, entry).and_then(|()| f.write_all(b" ")))
+        self.iter().try_for_each(|show| show.show_color(arguments, f, entry))
     }
 }
 
@@ -102,12 +105,12 @@ impl<T: Show> Show for Option<T> {
 impl<T: Show> Show for [T] {
     #[inline]
     fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_plain(arguments, f, entry).and_then(|()| f.write_all(b" ")))
+        self.iter().try_for_each(|show| show.show_plain(arguments, f, entry))
     }
 
     #[inline]
     fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_color(arguments, f, entry).and_then(|()| f.write_all(b" ")))
+        self.iter().try_for_each(|show| show.show_color(arguments, f, entry))
     }
 }
 

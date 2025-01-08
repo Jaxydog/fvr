@@ -24,6 +24,13 @@ use crate::arguments::model::Arguments;
 use crate::files::{is_executable, is_hidden};
 use crate::{optionally_vector, optionally_vector_color};
 
+const PIPE_BRIDGE_H: &[u8] = "┬".as_bytes();
+const PIPE_BRIDGE_V: &[u8] = "├".as_bytes();
+const PIPE_CORNER_B: &[u8] = "└".as_bytes();
+const PIPE_CORNER_T: &[u8] = "┌".as_bytes();
+const PIPE_HORIZONTAL: &[u8] = "─".as_bytes();
+const PIPE_VERTICAL: &[u8] = "│ ".as_bytes();
+
 /// Renders a file entry's name.
 #[must_use = "render implementations do nothing unless used"]
 #[derive(Clone, Copy, Debug)]
@@ -44,6 +51,22 @@ impl Name {
 #[expect(clippy::only_used_in_recursion, reason = "we still need to call the function")]
 impl Show for Name {
     fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
+        if let Some((depth, index, count)) = entry.depth.map(|v| (v, entry.index, entry.count)) {
+            let trail = &if depth == 0 && index == 0 { PIPE_CORNER_T.into() } else { PIPE_VERTICAL.repeat(depth) };
+            let corner = match index {
+                n if n == count - 1 => PIPE_CORNER_B,
+                n if n > 0 || depth != 0 => PIPE_BRIDGE_V,
+                _ => b"",
+            };
+            let bridge = if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+                PIPE_BRIDGE_H
+            } else {
+                PIPE_HORIZONTAL
+            };
+
+            optionally_vector!(f, [trail, corner, PIPE_HORIZONTAL, bridge, PIPE_HORIZONTAL])?;
+        }
+
         let file_name = if self.trim_paths {
             entry.path.file_name().unwrap_or(entry.path.as_os_str())
         } else {
@@ -77,7 +100,24 @@ impl Show for Name {
         }
     }
 
+    #[expect(clippy::cognitive_complexity, reason = "this is fine /s")]
     fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
+        if let Some((depth, index, count)) = entry.depth.map(|v| (v, entry.index, entry.count)) {
+            let trail = &if depth == 0 && index == 0 { PIPE_CORNER_T.into() } else { PIPE_VERTICAL.repeat(depth) };
+            let corner = match index {
+                n if n == count - 1 => PIPE_CORNER_B,
+                n if n > 0 || depth != 0 => PIPE_BRIDGE_V,
+                _ => b"",
+            };
+            let bridge = if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+                PIPE_BRIDGE_H
+            } else {
+                PIPE_HORIZONTAL
+            };
+
+            optionally_vector_color!(f, BrightBlack, [trail, corner, PIPE_HORIZONTAL, bridge, PIPE_HORIZONTAL])?;
+        }
+
         let file_name = if self.trim_paths {
             entry.path.file_name().unwrap_or(entry.path.as_os_str())
         } else {
@@ -126,7 +166,7 @@ impl Show for Name {
         } else if hidden {
             optionally_vector_color!(f, BrightBlack, [file_name.as_encoded_bytes()])
         } else {
-            optionally_vector_color!(f, White, [file_name.as_encoded_bytes()])
+            optionally_vector!(f, [file_name.as_encoded_bytes()])
         }
     }
 }
