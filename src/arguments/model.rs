@@ -142,6 +142,8 @@ pub struct ListArguments {
     pub paths: Paths,
     /// Whether to show hidden files.
     pub show_hidden: bool,
+    /// Whether to resolve symbolic links.
+    pub resolve_symlinks: bool,
     /// The preferred sorting function.
     pub sorting: Option<SortOrder>,
     /// The preferred mode visibility.
@@ -161,6 +163,8 @@ pub struct TreeArguments {
     pub paths: Paths,
     /// Whether to show hidden files.
     pub show_hidden: bool,
+    /// Whether to resolve symbolic links.
+    pub resolve_symlinks: bool,
     /// The preferred sorting function.
     pub sorting: Option<SortOrder>,
 }
@@ -330,7 +334,7 @@ pub enum SizeVisibility {
     #[default]
     Hide,
     /// Output the number of bytes.
-    Basic,
+    Simple,
     /// Output the size in base 2.
     Base2,
     /// Output the size in base 10.
@@ -351,7 +355,7 @@ impl SizeVisibility {
     /// [`Basic`]: SizeVisibility::Basic
     #[must_use]
     pub const fn is_basic(&self) -> bool {
-        matches!(self, Self::Basic)
+        matches!(self, Self::Simple)
     }
 
     /// Returns `true` if the size visibility is [`Base2`].

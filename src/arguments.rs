@@ -37,6 +37,8 @@ pub const SCHEMA: self::schema::Command<'static> = {
     const COLOR: Argument<'_> = Argument::new("color", "Determines whether to output with color")
         .value(Value::new("CHOICE").required().default("auto").options(&["auto", "always", "never"]));
     const ALL: Argument<'_> = Argument::new("all", "Show all entries, including hidden entries").short('a');
+    const RESOLVE_SYMLINKS: Argument<'_> =
+        Argument::new("resolve-symlinks", "Show the target file for symbolic links").short('r');
     const SORT: Argument<'_> = Argument::new("sort", "Determines the sorting order (comma separated)").value(
         Value::new("ORDER").required().list().default("name").options(&[
             "name",
@@ -55,7 +57,7 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]));
     const SIZE: Argument<'_> = Argument::new("size", "Determines whether to display an entry's file size")
         .short('s')
-        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "basic", "base-2", "base-10"]));
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "base-2", "base-10"]));
     const CREATED: Argument<'_> = Argument::new("created", "Determines whether to display an entry's creation date")
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
     const MODIFIED: Argument<'_> =
@@ -68,10 +70,10 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .sub_commands(&[
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, SORT, MODE, SIZE, CREATED, MODIFIED]),
+                .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT, MODE, SIZE, CREATED, MODIFIED]),
             Command::new("tree", "List the contents of directories in a tree-based view")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, SORT]),
+                .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT]),
         ])
 };
 
@@ -145,6 +147,7 @@ where
         Short('V') | Long("version") if arguments.command.is_none() => Some(self::parse_version()),
         Long("color") => self::parse_color(arguments, parser),
         Short('a') | Long("all") if arguments.command.is_some() => self::parse_all(arguments),
+        Short('r') | Long("resolve-symlinks") if arguments.command.is_some() => self::parse_resolve_symlinks(arguments),
         Long("sort") if arguments.command.is_some() => self::parse_sort(arguments, parser),
         Short('m') | Long("mode") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_mode(arguments, parser)
@@ -238,6 +241,18 @@ fn parse_all(arguments: &mut Arguments) -> Option<ParseResult> {
     None
 }
 
+/// Parses the resolve-symlinks command-line argument.
+fn parse_resolve_symlinks(arguments: &mut Arguments) -> Option<ParseResult> {
+    let Some(command) = arguments.command.as_mut() else { unreachable!() };
+
+    match command {
+        SubCommand::List(arguments) => arguments.resolve_symlinks = true,
+        SubCommand::Tree(arguments) => arguments.resolve_symlinks = true,
+    }
+
+    None
+}
+
 /// Parses the sort command-line argument.
 fn parse_sort<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
 where
@@ -325,7 +340,7 @@ where
 
     *size = match choice {
         "hide" => SizeVisibility::Hide,
-        "basic" => SizeVisibility::Basic,
+        "basic" => SizeVisibility::Simple,
         "base-2" => SizeVisibility::Base2,
         "base-10" => SizeVisibility::Base10,
         _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid size visibility")),

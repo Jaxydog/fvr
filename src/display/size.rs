@@ -129,7 +129,7 @@ impl Show for Size {
         if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
             return match self.visibility {
                 SizeVisibility::Hide => unreachable!(),
-                SizeVisibility::Basic => {
+                SizeVisibility::Simple => {
                     optionally_vector!(f, [b"-", &[b' '; 19]])
                 }
                 SizeVisibility::Base2 => {
@@ -143,7 +143,7 @@ impl Show for Size {
 
         match self.visibility {
             SizeVisibility::Hide => unreachable!(),
-            SizeVisibility::Basic => {
+            SizeVisibility::Simple => {
                 let mut buffer = itoa::Buffer::new();
                 let bytes = buffer.format(entry.data.map_or(0, MetadataExt::size)).as_bytes();
                 let padding = &[b' '; 20][.. 20 - bytes.len()];
@@ -179,7 +179,7 @@ impl Show for Size {
         if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
             return match self.visibility {
                 SizeVisibility::Hide => unreachable!(),
-                SizeVisibility::Basic => {
+                SizeVisibility::Simple => {
                     optionally_vector_color!(f, BrightBlack, [b"-", &[b' '; 19]])
                 }
                 SizeVisibility::Base2 => {
@@ -195,7 +195,7 @@ impl Show for Size {
 
         match self.visibility {
             SizeVisibility::Hide => unreachable!(),
-            SizeVisibility::Basic => {
+            SizeVisibility::Simple => {
                 let mut buffer = itoa::Buffer::new();
                 let bytes = buffer.format(size).as_bytes();
                 let padding = &[b' '; 20][.. 20 - bytes.len()];

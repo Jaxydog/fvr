@@ -35,11 +35,11 @@ use crate::files::is_hidden;
 pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::List(list_arguments)) = arguments.command.as_ref() else { unreachable!() };
 
-    let filter = crate::files::filter::by(|v, _| list_arguments.show_hidden || is_hidden(v));
+    let filter = crate::files::filter::by(|v, _| list_arguments.show_hidden || !is_hidden(v));
     let sorter = list_arguments.sorting.clone().unwrap_or_default();
     let sorter = sorter.compile();
 
-    let name_display = Name::new(true, true);
+    let name_display = Name::new(list_arguments.resolve_symlinks, true);
     let mode_display = match list_arguments.mode {
         ModeVisibility::Hide => None,
         ModeVisibility::Show => Some(Mode::new(false)),
