@@ -59,10 +59,10 @@ fn main() -> ExitCode {
         ParseResult::Exit(code) => return ExitCode::from(code),
     };
 
-    if let Err(error) = match arguments.command.as_ref() {
+    if let Err(error) = match &arguments.command {
         None => unreachable!(),
-        Some(SubCommand::List(list_arguments)) => self::command::list::invoke(&arguments, list_arguments),
-        Some(SubCommand::Tree(tree_arguments)) => self::command::tree::invoke(&arguments, tree_arguments),
+        Some(SubCommand::List(_)) => self::command::list::invoke(&arguments),
+        Some(SubCommand::Tree(_)) => self::command::tree::invoke(&arguments),
     } {
         eprintln!("{error}");
 

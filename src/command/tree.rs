@@ -16,13 +16,15 @@
 
 //! Implements the tree sub-command.
 
-use crate::arguments::model::{Arguments, TreeArguments};
+use crate::arguments::model::{Arguments, SubCommand};
 
 /// Runs the command.
 ///
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub const fn invoke(_arguments: &Arguments, _list_arguments: &TreeArguments) -> std::io::Result<()> {
+pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
+    let Some(SubCommand::Tree(_list_arguments)) = arguments.command.as_ref() else { unreachable!() };
+
     Ok(())
 }

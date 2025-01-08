@@ -17,52 +17,58 @@
 //! Implements the list sub-command.
 
 use std::io::Write;
-use std::os::unix::fs::MetadataExt;
 
-use super::super::arguments::model::SortingFunction;
-use crate::arguments::model::{Arguments, ListArguments, ModeVisibility};
-use crate::display::Rendered;
+use crate::arguments::model::{Arguments, ModeVisibility, SubCommand};
 use crate::display::mode::Mode;
 use crate::display::name::Name;
+use crate::display::{Show, ShowData};
+use crate::files::is_hidden;
 
 /// Runs the command.
 ///
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub fn invoke(arguments: &Arguments, list_arguments: &ListArguments) -> std::io::Result<()> {
-    let filter = crate::files::filtering::visible(list_arguments.show_hidden);
-    let sorter = list_arguments.sorting.as_ref().map(SortingFunction::get);
+pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
+    let Some(SubCommand::List(list_arguments)) = arguments.command.as_ref() else { unreachable!() };
 
-    let should_show_permissions = match list_arguments.mode {
+    let filter = crate::files::filter::by(|v, _| list_arguments.show_hidden || is_hidden(v));
+    let sorter = list_arguments.sorting.clone().unwrap_or_default();
+    let sorter = sorter.compile();
+
+    let name_display = Name::new(true, true);
+    let mode_display = match list_arguments.mode {
         ModeVisibility::Hide => None,
-        ModeVisibility::Show => Some(false),
-        ModeVisibility::Extended => Some(true),
+        ModeVisibility::Show => Some(Mode::new(false)),
+        ModeVisibility::Extended => Some(Mode::new(true)),
     };
 
     let f = &mut std::io::stdout().lock();
 
     for (index, path) in list_arguments.paths.get().enumerate() {
+        let remaining = list_arguments.paths.len() - index;
+        let root_entry = ShowData { path, data: None, remaining, depth: None };
+
         if list_arguments.paths.len() > 1 {
             if index > 0 {
                 f.write_all(b"\n")?;
             }
 
-            Name::new(path, false).show(arguments, f)?;
+            name_display.show(arguments, f, root_entry)?;
 
             f.write_all(b":\n")?;
         }
 
-        crate::files::visit_directory(path, sorter, filter, |path, _remaining| {
-            if let Some(extended) = should_show_permissions {
-                let mode = path.symlink_metadata()?.mode();
+        crate::files::visit(path, &filter, &sorter, |path, data, remaining| {
+            let entry = ShowData { path, data: Some(data), remaining, depth: None };
 
-                Mode::new(mode, extended).show(arguments, f)?;
+            if let Some(mode_display) = mode_display {
+                mode_display.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            Name::new(path, true).show(arguments, f)?;
+            name_display.show(arguments, f, entry)?;
 
             f.write_all(b"\n")
         })?;

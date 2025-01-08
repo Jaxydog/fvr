@@ -16,254 +16,92 @@
 
 //! Defines utilities for mapping out file tree structures.
 
-use std::cmp::Ordering;
+use std::fs::Metadata;
+use std::io::Result;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
 
-/// Provides commonly-used sort functions for usage in [`visit_directory`][0].
-///
-/// [0]: crate::files::visit_directory
-pub mod filtering {
-    use std::path::Path;
+use self::filter::Filter;
+use self::sort::Sort;
+use crate::display::mode::permissions::EXECUTE;
 
-    /// Filter out entries by the given visibility enum.
-    #[inline]
-    pub const fn visible(show_hidden: bool) -> impl Copy + Fn(&Path) -> bool {
-        move |path| show_hidden || path.file_name().is_none_or(|n| !n.to_string_lossy().starts_with('.'))
-    }
-
-    /// Inverts a filtering function.
-    #[inline]
-    pub const fn not<F>(a: F) -> impl Copy + Fn(&Path) -> bool
-    where
-        F: Copy + Fn(&Path) -> bool,
-    {
-        move |path| !a(path)
-    }
-
-    /// Combines two filtering functions with the given closure.
-    #[inline]
-    pub const fn mix<A, B, F>(a: A, b: B, f: F) -> impl Copy + Fn(&Path) -> bool
-    where
-        A: Copy + Fn(&Path) -> bool,
-        B: Copy + Fn(&Path) -> bool,
-        F: Copy + Fn(bool, bool) -> bool,
-    {
-        move |path| f(a(path), b(path))
-    }
-
-    /// Combines two filtering functions with a logical and.
-    #[inline]
-    pub const fn and<A, B>(a: A, b: B) -> impl Copy + Fn(&Path) -> bool
-    where
-        A: Copy + Fn(&Path) -> bool,
-        B: Copy + Fn(&Path) -> bool,
-    {
-        self::mix(a, b, |a, b| a && b)
-    }
-
-    /// Combines two filtering functions with a logical or.
-    #[inline]
-    pub const fn or<A, B>(a: A, b: B) -> impl Copy + Fn(&Path) -> bool
-    where
-        A: Copy + Fn(&Path) -> bool,
-        B: Copy + Fn(&Path) -> bool,
-    {
-        self::mix(a, b, |a, b| a || b)
-    }
-
-    /// Combines two filtering functions with a logical xor.
-    #[inline]
-    pub const fn xor<A, B>(a: A, b: B) -> impl Copy + Fn(&Path) -> bool
-    where
-        A: Copy + Fn(&Path) -> bool,
-        B: Copy + Fn(&Path) -> bool,
-    {
-        self::mix(a, b, |a, b| a ^ b)
-    }
-}
-
-/// Provides commonly-used sort functions for usage in [`visit_directory`][0].
-///
-/// [0]: crate::files::visit_directory
-pub mod sorting {
-    use std::cmp::Ordering;
-    use std::ops::Try;
-    use std::path::Path;
-
-    /// A constant for a valid [`None`] type for convenience.
-    pub const NONE: Option<fn(&Path, &Path) -> Ordering> = None;
-
-    /// Sorts paths using their file names.
-    #[inline]
-    pub const fn name() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        |lhs: &Path, rhs: &Path| lhs.file_name().zip(rhs.file_name()).map_or(Ordering::Equal, |(lhs, rhs)| lhs.cmp(rhs))
-    }
-
-    /// Sorts paths using their creation dates.
-    #[inline]
-    pub const fn created() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        self::try_extract(|path| path.symlink_metadata().and_then(|v| v.created()))
-    }
-
-    /// Sorts paths using their modification dates.
-    #[inline]
-    pub const fn modified() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        self::try_extract(|path| path.symlink_metadata().and_then(|v| v.modified()))
-    }
-
-    /// Sorts paths by files.
-    #[inline]
-    pub const fn files() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        self::reverse(self::extract(Path::is_file))
-    }
-
-    /// Sorts paths by symbolic links.
-    #[inline]
-    pub const fn symlinks() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        self::reverse(self::extract(Path::is_symlink))
-    }
-
-    /// Sorts paths by directories.
-    #[inline]
-    pub const fn directories() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        self::reverse(self::extract(Path::is_dir))
-    }
-
-    /// Sorts paths by hidden files.
-    #[inline]
-    pub const fn hidden() -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering {
-        self::reverse(self::try_extract(|path| path.file_name().map(|s| s.to_string_lossy().starts_with('.'))))
-    }
-
-    /// Sorts paths using the given value extraction function.
-    #[inline]
-    pub const fn extract<F, T>(f: F) -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering
-    where
-        F: Fn(&Path) -> T,
-        T: Ord,
-    {
-        move |lhs: &Path, rhs: &Path| f(lhs).cmp(&f(rhs))
-    }
-
-    /// Sorts paths using the given fallible value extraction function.
-    #[inline]
-    pub const fn try_extract<F, R>(f: F) -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering
-    where
-        F: Fn(&Path) -> R,
-        R: Try<Output: Ord>,
-    {
-        move |lhs, rhs| match f(lhs).branch().continue_value().zip(f(rhs).branch().continue_value()) {
-            Some((lhs, rhs)) => lhs.cmp(&rhs),
-            None => Ordering::Equal,
-        }
-    }
-
-    /// Inverts a sorting function.
-    #[inline]
-    pub const fn reverse<F>(f: F) -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering
-    where
-        F: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-    {
-        move |lhs, rhs| f(lhs, rhs).reverse()
-    }
-
-    /// Combines two sorting functions with the given closure.
-    #[inline]
-    pub const fn mix<A, B, F>(a: A, b: B, f: F) -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering
-    where
-        A: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-        B: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-        F: Fn(Ordering, Ordering) -> Ordering,
-    {
-        move |lhs, rhs| f(a(lhs, rhs), b(lhs, rhs))
-    }
-
-    /// Combines two sorting functions by chaining the second after the first.
-    #[inline]
-    pub const fn then<A, B>(a: A, b: B) -> impl for<'p> Fn(&'p Path, &'p Path) -> Ordering
-    where
-        A: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-        B: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-    {
-        self::mix(a, b, Ordering::then)
-    }
-}
+pub mod filter;
+pub mod sort;
 
 /// Iterates over the file system, calling the given function for each entry.
 ///
-/// The given closure accepts two arguments; the file path and the estimated amount of remaining entries.
+/// The given closure accepts three arguments; the file path, its metadata, and the estimated amount of remaining
+/// entries.
 ///
 /// # Errors
 ///
 /// This function will return an error if iteration fails for any reason.
-pub fn visit_directory<P, S, F, V>(root: P, sort: Option<&S>, filter: F, mut visit: V) -> std::io::Result<()>
+pub fn visit<P, S, F, V>(path: P, filter: &F, sort: &S, mut visit: V) -> Result<()>
 where
     P: AsRef<Path>,
-    S: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-    F: for<'p> Fn(&'p Path) -> bool,
-    V: for<'de> FnMut(&'de Path, usize) -> std::io::Result<()>,
+    F: Filter,
+    S: Sort,
+    V: FnMut(&Path, &Metadata, usize) -> Result<()>,
 {
-    let iterator = std::fs::read_dir(&root)?
-        .map(|result| result.map(|entry| entry.path().into_boxed_path()))
-        .filter(|result| result.as_ref().map_or(true, |path| filter(path)));
+    let mut collection = std::fs::read_dir(path.as_ref())?
+        .map(|v| v.and_then(|v| Ok((v.path(), v.metadata()?))))
+        .filter(|v| v.as_ref().is_ok_and(|(p, d)| filter.filter(p, d)))
+        .collect::<Result<Box<[(PathBuf, Metadata)]>>>()?;
 
-    let total_entries = std::fs::read_dir(&root)?.count();
+    collection.sort_unstable_by(|(l_path, l_data), (r_path, r_data)| sort.sort((l_path, l_data), (r_path, r_data)));
 
-    if let Some(sort) = sort {
-        let mut entries: Box<[std::io::Result<Box<Path>>]> = iterator.collect();
-
-        entries.sort_by(|l, r| match (l, r) {
-            (Ok(l), Ok(r)) => sort(l, r),
-            (Err(_), Ok(_)) => Ordering::Less,
-            (Ok(_), Err(_)) => Ordering::Greater,
-            (Err(_), Err(_)) => Ordering::Equal,
-        });
-
-        Box::into_iter(entries).enumerate().try_for_each(|(index, result)| {
-            let remaining = total_entries.saturating_sub(index);
-
-            result.and_then(|path| visit(&path, remaining))
-        })
-    } else {
-        iterator.enumerate().try_for_each(|(index, result)| {
-            let remaining = total_entries.saturating_sub(index);
-
-            result.and_then(|path| visit(&path, remaining))
-        })
-    }
+    collection.iter().enumerate().try_for_each(|(index, (path, data))| visit(path, data, collection.len() - index))
 }
 
 /// Iterates over the file system recursively, calling the given function for each entry.
 ///
-/// The given closure accepts three arguments; the file path, the estimated amount of remaining entries, and the current
-/// depth from the starting path.
+/// The given closure accepts four arguments; the file path, its metadata, the estimated amount of remaining entries,
+/// and the current depth from the starting path.
 ///
 /// # Errors
 ///
 /// This function will return an error if iteration fails for any reason.
-pub fn visit_directory_tree<P, S, F, V>(root: P, sort: Option<&S>, filter: F, visit: V) -> std::io::Result<()>
+pub fn visit_recursive<P, S, F, V>(path: P, filter: &F, sort: &S, visit: V) -> Result<()>
 where
     P: AsRef<Path>,
-    S: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-    F: Copy + for<'p> Fn(&'p Path) -> bool,
-    V: Copy + for<'de> FnMut(&'de Path, usize, usize) -> std::io::Result<()>,
+    F: Filter,
+    S: Sort,
+    V: FnMut(&Path, &Metadata, usize, usize) -> Result<()>,
 {
     #[inline]
-    fn inner<P, S, F, V>(root: P, sort: Option<&S>, filter: F, mut visit: V, depth: usize) -> std::io::Result<()>
+    fn recurse<P, S, F, V>(path: P, filter: &F, sort: &S, mut visit: V, depth: usize) -> Result<()>
     where
         P: AsRef<Path>,
-        S: for<'p> Fn(&'p Path, &'p Path) -> Ordering,
-        F: Copy + for<'p> Fn(&'p Path) -> bool,
-        V: Copy + for<'de> FnMut(&'de Path, usize, usize) -> std::io::Result<()>,
+        F: Filter,
+        S: Sort,
+        V: FnMut(&Path, &Metadata, usize, usize) -> Result<()>,
     {
-        self::visit_directory(root, sort, filter, |path, remaining| {
-            visit(path, remaining, depth)?;
+        self::visit(
+            &path,
+            &self::filter::by(|path, data| filter.depth_filter(path, data, depth)),
+            &self::sort::by(|lhs, rhs| sort.depth_sort(lhs, rhs, depth)),
+            |path, data, remaining| visit(path, data, remaining, depth),
+        )?;
 
-            if path.is_dir() { inner(path, sort, filter, visit, depth.saturating_add(1)) } else { Ok(()) }
-        })
+        recurse(path, filter, sort, visit, depth.saturating_add(1))
     }
 
-    inner(root, sort, filter, visit, 0)
+    recurse(path, filter, sort, visit, 0)
+}
+
+/// Returns `true` if the given path is considered 'hidden'.
+pub fn is_hidden<P>(path: P) -> bool
+where
+    P: AsRef<Path>,
+{
+    path.as_ref().file_name().and_then(|v| v.as_bytes().first()).copied().is_some_and(|v| v == b'.')
+}
+
+/// Returns `true` if the given metadata is executable.
+#[must_use]
+pub fn is_executable(data: &Metadata) -> bool {
+    data.mode() & EXECUTE != 0
 }
 
 /// Returns a new path that represents the relative path from `root` to `path`.

@@ -19,7 +19,7 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use model::{ModeVisibility, SortingFunction};
+use model::{ModeVisibility, SortOrder};
 
 use self::model::{Arguments, ColorChoice, ListArguments, SubCommand, TreeArguments};
 use self::parse::{Argument, Parser};
@@ -240,28 +240,26 @@ where
 
     *sorting = None;
 
-    for ordering in orderings.split(',') {
-        use crate::files::sorting::{created, directories, files, hidden, modified, name, reverse, symlinks, then};
-
-        let mut function = match ordering.trim_start_matches("reverse-") {
-            "name" => SortingFunction::new(name()),
-            "created" => SortingFunction::new(created()),
-            "modified" => SortingFunction::new(modified()),
-            "files" => SortingFunction::new(files()),
-            "symlinks" => SortingFunction::new(symlinks()),
-            "directories" => SortingFunction::new(directories()),
-            "hidden" => SortingFunction::new(hidden()),
+    for string in orderings.split(',') {
+        let mut next = match string.trim_start_matches("reverse-") {
+            "name" => SortOrder::Name,
+            "created" => SortOrder::Created,
+            "modified" => SortOrder::Modified,
+            "files" => SortOrder::Files,
+            "symlinks" => SortOrder::Symlinks,
+            "directories" => SortOrder::Directories,
+            "hidden" => SortOrder::Hidden,
             _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid ordering string")),
         };
 
-        if ordering.starts_with("reverse-") {
-            function = SortingFunction::new(reverse(function.unpack()));
+        if string.starts_with("reverse-") {
+            next = next.reverse();
         }
 
-        if let Some(current) = sorting.take().map(|v| v.unpack()) {
-            *sorting = Some(SortingFunction::new(then(current, function.unpack())));
+        if let Some(current) = sorting.take().filter(|v| v.top() != &next) {
+            *sorting = Some(current.then(next));
         } else {
-            *sorting = Some(function);
+            *sorting = Some(next);
         }
     }
 

@@ -16,108 +16,117 @@
 
 //! Implements entry file name displays.
 
-use std::io::{Result, StdoutLock, Write};
-use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::fs::Metadata;
+use std::io::{Result, StdoutLock};
 
-use owo_colors::OwoColorize;
-
-use super::Rendered;
-use super::mode::permissions::EXECUTE;
+use super::{Show, ShowData};
 use crate::arguments::model::Arguments;
-use crate::optionally_vector;
+use crate::files::{is_executable, is_hidden};
+use crate::{optionally_vector, optionally_vector_color};
 
 /// Renders a file entry's Unix mode.
 #[must_use = "render implementations do nothing unless used"]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Name<'e> {
-    /// The inner path name.
-    path: &'e Path,
+#[derive(Clone, Copy, Debug)]
+pub struct Name {
     /// Whether to resolve symbolic links.
     resolve_symlinks: bool,
     /// Whether to trim file paths.
     trim_paths: bool,
 }
 
-impl<'e> Name<'e> {
+impl Name {
     /// Creates a new [`Name`].
-    pub const fn new(path: &'e Path, resolve_symlinks: bool) -> Self {
-        Self { path, resolve_symlinks, trim_paths: true }
+    pub const fn new(resolve_symlinks: bool, trim_paths: bool) -> Self {
+        Self { resolve_symlinks, trim_paths }
     }
 }
 
-impl Rendered for Name<'_> {
-    #[expect(clippy::only_used_in_recursion, reason = "cannot change signature as this is a trait impl")]
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock) -> Result<()> {
-        let is_hidden = self.path.file_name().is_some_and(|v| v.to_string_lossy().starts_with('.'));
-        let path = if self.trim_paths {
-            self.path.file_name().or_else(|| self.path.parent().map(Path::as_os_str)).unwrap_or_default()
+#[expect(clippy::only_used_in_recursion, reason = "we still need to call the function")]
+impl Show for Name {
+    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
+        let file_name = if self.trim_paths {
+            entry.path.file_name().unwrap_or(entry.path.as_os_str())
         } else {
-            self.path.as_os_str()
+            entry.path.as_os_str()
         };
 
-        if self.path.is_dir() {
-            if is_hidden {
-                write!(f, "{}", format_args!("{}/", path.to_string_lossy()).blue())?;
-            } else {
-                write!(f, "{}", format_args!("{}/", path.to_string_lossy()).bright_blue())?;
-            }
-        } else if self.path.is_file() && self.path.symlink_metadata().is_ok_and(|m| m.mode() & EXECUTE != 0) {
-            if is_hidden {
-                write!(f, "{}", format_args!("{}*", path.to_string_lossy()).green())?;
-            } else {
-                write!(f, "{}", format_args!("{}*", path.to_string_lossy()).bright_green())?;
-            }
-        } else if is_hidden {
-            write!(f, "{}", path.to_string_lossy().bright_black())?;
-        } else {
-            f.write_all(path.as_encoded_bytes())?;
-        };
-
-        if self.resolve_symlinks && self.path.is_symlink() {
-            let resolved = std::fs::read_link(self.path)?;
-
-            if resolved.try_exists()? {
-                write!(f, " {} ", "->".bright_cyan())?;
-            } else {
-                write!(f, " {} ", "~>".bright_red())?;
-            };
-
-            let relative = crate::files::relativize(self.path, &resolved).unwrap_or(resolved);
-
-            Name { path: &relative, resolve_symlinks: false, trim_paths: false }.show_color(arguments, f)?;
-        }
-
-        Ok(())
-    }
-
-    #[expect(clippy::only_used_in_recursion, reason = "cannot change signature as this is a trait impl")]
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock) -> Result<()> {
-        let path = if self.trim_paths {
-            self.path.file_name().or_else(|| self.path.parent().map(Path::as_os_str)).unwrap_or_default()
-        } else {
-            self.path.as_os_str()
-        };
-
-        let additional: Option<&[u8]> = if self.path.is_dir() {
-            Some(b"/")
-        } else if self.path.is_file() && self.path.symlink_metadata().is_ok_and(|m| m.mode() & EXECUTE != 0) {
-            Some(b"*")
+        let executable = entry.data.is_some_and(is_executable);
+        let additional = if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+            Some::<&[u8]>(b"/")
+        } else if entry.data.map_or_else(|| entry.path.is_file(), Metadata::is_file) && executable {
+            Some::<&[u8]>(b"*")
         } else {
             None
-        };
-        let additional = additional.unwrap_or(&[]);
+        }
+        .unwrap_or(&[]);
 
-        if self.resolve_symlinks && self.path.is_symlink() {
-            let resolved = std::fs::read_link(self.path)?;
+        if self.resolve_symlinks && entry.data.map_or_else(|| entry.path.is_symlink(), Metadata::is_symlink) {
+            let resolved = std::fs::read_link(entry.path)?;
+            let metadata = std::fs::symlink_metadata(&resolved).ok();
+
             let arrow = if resolved.try_exists()? { b" -> " } else { b" ~> " };
-            let relative = crate::files::relativize(self.path, &resolved).unwrap_or(resolved);
+            let relative = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
 
-            optionally_vector!(f, [path.as_encoded_bytes(), additional, arrow])?;
+            optionally_vector!(f, [file_name.as_encoded_bytes(), additional, arrow])?;
 
-            Name { path: &relative, resolve_symlinks: false, trim_paths: false }.show_plain(arguments, f)
+            let entry = ShowData { path: &relative, data: metadata.as_ref(), ..entry };
+
+            Self { resolve_symlinks: false, trim_paths: false }.show_plain(arguments, f, entry)
         } else {
-            optionally_vector!(f, [path.as_encoded_bytes(), additional])
+            optionally_vector!(f, [file_name.as_encoded_bytes(), additional])
+        }
+    }
+
+    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
+        let file_name = if self.trim_paths {
+            entry.path.file_name().unwrap_or(entry.path.as_os_str())
+        } else {
+            entry.path.as_os_str()
+        };
+
+        let executable = entry.data.is_some_and(is_executable);
+        let hidden = is_hidden(entry.path);
+
+        if entry.data.map_or_else(|| entry.path.is_symlink(), Metadata::is_symlink) {
+            if hidden {
+                optionally_vector_color!(f, Cyan, [file_name.as_encoded_bytes()])?;
+            } else {
+                optionally_vector_color!(f, BrightCyan, [file_name.as_encoded_bytes()])?;
+            }
+
+            if self.resolve_symlinks {
+                let resolved = std::fs::read_link(entry.path)?;
+                let metadata = std::fs::symlink_metadata(&resolved).ok();
+
+                if resolved.try_exists()? {
+                    optionally_vector_color!(f, BrightRed, [b" -> "])?;
+                } else {
+                    optionally_vector_color!(f, BrightRed, [b" ~> "])?;
+                };
+
+                let relative = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
+                let entry = ShowData { path: &relative, data: metadata.as_ref(), ..entry };
+
+                Self { resolve_symlinks: false, trim_paths: false }.show_color(arguments, f, entry)?;
+            }
+
+            Ok(())
+        } else if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+            if hidden {
+                optionally_vector_color!(f, Blue, [file_name.as_encoded_bytes(), b"/"])
+            } else {
+                optionally_vector_color!(f, BrightBlue, [file_name.as_encoded_bytes(), b"/"])
+            }
+        } else if entry.data.map_or_else(|| entry.path.is_file(), Metadata::is_file) && executable {
+            if hidden {
+                optionally_vector_color!(f, Green, [file_name.as_encoded_bytes(), b"*"])
+            } else {
+                optionally_vector_color!(f, BrightGreen, [file_name.as_encoded_bytes(), b"*"])
+            }
+        } else if hidden {
+            optionally_vector_color!(f, BrightBlack, [file_name.as_encoded_bytes()])
+        } else {
+            optionally_vector_color!(f, White, [file_name.as_encoded_bytes()])
         }
     }
 }

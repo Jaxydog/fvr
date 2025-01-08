@@ -16,47 +16,62 @@
 
 //! Provides custom display implementations for various types of file entry data.
 
-use std::io::StdoutLock;
+use std::fs::Metadata;
+use std::io::{Result, StdoutLock};
+use std::path::Path;
 
 use crate::arguments::model::{Arguments, ColorChoice};
 
 pub mod mode;
 pub mod name;
 
-/// A value that should be rendered into the terminal.
-pub trait Rendered {
+/// The data provided to a [`Show`] call.
+#[derive(Clone, Copy, Debug)]
+pub struct ShowData<'p> {
+    /// The entry path.
+    pub path: &'p Path,
+    /// The entry metadata, if available.
+    pub data: Option<&'p Metadata>,
+    /// The remaining number of entries.
+    pub remaining: usize,
+    /// The current depth, if this is used in a recursive call.
+    pub depth: Option<usize>,
+}
+
+/// A value that should be shown to the terminal.
+pub trait Show {
     /// Outputs this value into the given output stream.
     ///
     /// # Errors
     ///
     /// This function will return an error if the data could not be output.
-    fn show(&self, arguments: &Arguments, f: &mut StdoutLock) -> std::io::Result<()> {
+    fn show(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
         match arguments.color {
             ColorChoice::Auto => {
                 if supports_color::on_cached(supports_color::Stream::Stdout).is_some_and(|v| v.has_basic) {
-                    self.show_color(arguments, f)
+                    self.show_color(arguments, f, entry)
                 } else {
-                    self.show_plain(arguments, f)
+                    self.show_plain(arguments, f, entry)
                 }
             }
-            ColorChoice::Always => self.show_color(arguments, f),
-            ColorChoice::Never => self.show_plain(arguments, f),
+            ColorChoice::Always => self.show_color(arguments, f, entry),
+            ColorChoice::Never => self.show_plain(arguments, f, entry),
         }
     }
+
+    /// Outputs this value into the given output stream with no color.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the data could not be output.
+    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()>;
 
     /// Outputs this value into the given output stream with color.
     ///
     /// # Errors
     ///
     /// This function will return an error if the data could not be output.
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock) -> std::io::Result<()>;
-
-    /// Outputs this value into the given output stream without color.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the data could not be output.
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock) -> std::io::Result<()>;
+    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()>;
 }
 
 /// Outputs the given list of slices using [`write_all_vectored`][0] if possible.
@@ -84,5 +99,29 @@ macro_rules! optionally_vector {
 
             ::std::io::Result::Ok(())
         }
+    };
+}
+
+/// Outputs the given list of slices using [`write_all_vectored`][0] if possible, while also applying a color style.
+///
+/// # Examples
+///
+/// ```
+/// optionally_vector!(&mut std::io::stdout().lock(), [
+///     b"a slice of bytes,",
+///     b"followed by another slice of bytes",
+/// ])
+/// .expect("writing failed");
+/// ```
+///
+/// [0]: std::io::Write::write_all_vectored
+#[macro_export]
+macro_rules! optionally_vector_color {
+    ($f:ident, $color:ident, [$($slice:expr),* $(,)?]) => {
+        $crate::optionally_vector!($f, [
+            <::owo_colors::colors::$color as ::owo_colors::Color>::ANSI_FG.as_bytes(),
+            $($slice,)*
+            <::owo_colors::colors::Default as ::owo_colors::Color>::ANSI_FG.as_bytes(),
+        ])
     };
 }

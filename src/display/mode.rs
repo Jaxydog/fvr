@@ -16,13 +16,12 @@
 
 //! Implements Unix file mode displays.
 
-use std::io::{StdoutLock, Write};
+use std::io::{Result, StdoutLock};
+use std::os::unix::fs::MetadataExt;
 
-use owo_colors::OwoColorize;
-
-use super::Rendered;
+use super::{Show, ShowData};
 use crate::arguments::model::Arguments;
-use crate::optionally_vector;
+use crate::{optionally_vector, optionally_vector_color};
 
 /// Defines constants related to file entry types.
 pub mod file_type {
@@ -88,21 +87,19 @@ pub mod permissions {
 #[must_use = "render implementations do nothing unless used"]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mode {
-    /// The inner mode integer.
-    mode: u32,
     /// Whether to use extended permissions.
     extended: bool,
 }
 
 impl Mode {
     /// Creates a new [`Mode`].
-    pub const fn new(mode: u32, extended: bool) -> Self {
-        Self { mode, extended }
+    pub const fn new(extended: bool) -> Self {
+        Self { extended }
     }
 
     /// Returns the file type character.
-    const fn file_type(self) -> char {
-        match self.mode & self::file_type::MASK {
+    const fn file_type(mode: u32) -> char {
+        match mode & self::file_type::MASK {
             self::file_type::SOCKET => 's',
             self::file_type::SYMBOLIC_LINK => 'l',
             self::file_type::FILE => '-',
@@ -115,75 +112,78 @@ impl Mode {
     }
 
     /// Returns the permissions characters.
-    const fn file_permissions(self) -> [[char; 3]; 4] {
+    const fn file_permissions(mode: u32) -> [[char; 3]; 4] {
         use self::permissions::{
             EXECUTE, MASK_EXTRA, MASK_GROUP, MASK_OTHER, MASK_OWNER, READ, SETGID, SETUID, STICKY, WRITE, test,
         };
 
         [
             [
-                if test::<MASK_EXTRA, SETUID>(self.mode) { 'u' } else { '-' },
-                if test::<MASK_EXTRA, SETGID>(self.mode) { 'g' } else { '-' },
-                if test::<MASK_EXTRA, STICKY>(self.mode) { 's' } else { '-' },
+                if test::<MASK_EXTRA, SETUID>(mode) { 'u' } else { '-' },
+                if test::<MASK_EXTRA, SETGID>(mode) { 'g' } else { '-' },
+                if test::<MASK_EXTRA, STICKY>(mode) { 's' } else { '-' },
             ],
             [
-                if test::<MASK_OWNER, READ>(self.mode) { 'r' } else { '-' },
-                if test::<MASK_OWNER, WRITE>(self.mode) { 'w' } else { '-' },
-                if test::<MASK_OWNER, EXECUTE>(self.mode) { 'x' } else { '-' },
+                if test::<MASK_OWNER, READ>(mode) { 'r' } else { '-' },
+                if test::<MASK_OWNER, WRITE>(mode) { 'w' } else { '-' },
+                if test::<MASK_OWNER, EXECUTE>(mode) { 'x' } else { '-' },
             ],
             [
-                if test::<MASK_GROUP, READ>(self.mode) { 'r' } else { '-' },
-                if test::<MASK_GROUP, WRITE>(self.mode) { 'w' } else { '-' },
-                if test::<MASK_GROUP, EXECUTE>(self.mode) { 'x' } else { '-' },
+                if test::<MASK_GROUP, READ>(mode) { 'r' } else { '-' },
+                if test::<MASK_GROUP, WRITE>(mode) { 'w' } else { '-' },
+                if test::<MASK_GROUP, EXECUTE>(mode) { 'x' } else { '-' },
             ],
             [
-                if test::<MASK_OTHER, READ>(self.mode) { 'r' } else { '-' },
-                if test::<MASK_OTHER, WRITE>(self.mode) { 'w' } else { '-' },
-                if test::<MASK_OTHER, EXECUTE>(self.mode) { 'x' } else { '-' },
+                if test::<MASK_OTHER, READ>(mode) { 'r' } else { '-' },
+                if test::<MASK_OTHER, WRITE>(mode) { 'w' } else { '-' },
+                if test::<MASK_OTHER, EXECUTE>(mode) { 'x' } else { '-' },
             ],
         ]
     }
 }
 
-impl Rendered for Mode {
-    fn show_color(&self, _: &Arguments, f: &mut StdoutLock) -> std::io::Result<()> {
-        write!(f, "{}", '['.bright_black())?;
+impl Show for Mode {
+    fn show_plain(&self, _: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
+        let mode = entry.data.map_or(0, MetadataExt::mode);
+        let permissions = Self::file_permissions(mode).map(|s| s.map(|c| c as u8));
+        let permissions = if self.extended { permissions.as_flattened() } else { permissions[1 ..].as_flattened() };
 
-        match self.file_type() {
-            c @ 's' => write!(f, "{}", c.bright_green()),
-            c @ 'l' => write!(f, "{}", c.bright_cyan()),
-            c @ '-' => write!(f, "{}", c.bright_white()),
-            c @ 'b' => write!(f, "{}", c.bright_red()),
-            c @ 'd' => write!(f, "{}", c.bright_blue()),
-            c @ 'c' => write!(f, "{}", c.bright_purple()),
-            c @ 'p' => write!(f, "{}", c.bright_yellow()),
-            c @ '?' => write!(f, "{}", c.bright_black()),
+        optionally_vector!(f, [&[b'[', Self::file_type(mode) as u8], permissions, b"]"])
+    }
+
+    fn show_color(&self, _: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
+        let mode = entry.data.map_or(0, MetadataExt::mode);
+        let file_type = Self::file_type(mode);
+        let permissions = Self::file_permissions(mode).map(|s| s.map(|c| c as u8));
+        let permissions = if self.extended { permissions.as_flattened() } else { permissions[1 ..].as_flattened() };
+
+        optionally_vector_color!(f, BrightBlack, [b"["])?;
+
+        match file_type {
+            's' => optionally_vector_color!(f, BrightGreen, [&[file_type as u8]]),
+            'l' => optionally_vector_color!(f, BrightCyan, [&[file_type as u8]]),
+            '-' => optionally_vector_color!(f, BrightWhite, [&[file_type as u8]]),
+            'b' => optionally_vector_color!(f, BrightRed, [&[file_type as u8]]),
+            'd' => optionally_vector_color!(f, BrightBlue, [&[file_type as u8]]),
+            'c' => optionally_vector_color!(f, BrightMagenta, [&[file_type as u8]]),
+            'p' => optionally_vector_color!(f, BrightYellow, [&[file_type as u8]]),
+            '?' => optionally_vector_color!(f, BrightBlack, [&[file_type as u8]]),
             _ => unreachable!(),
         }?;
 
-        let permissions = self.file_permissions();
-        let permissions = if self.extended { permissions.as_flattened() } else { permissions[1 ..].as_flattened() };
-
         for permission in permissions {
             match permission {
-                c @ 'r' => write!(f, "{}", c.bright_yellow()),
-                c @ 'w' => write!(f, "{}", c.bright_red()),
-                c @ 'x' => write!(f, "{}", c.bright_green()),
-                c @ '-' => write!(f, "{}", c.bright_black()),
-                c @ 'u' => write!(f, "{}", c.bright_blue()),
-                c @ 'g' => write!(f, "{}", c.bright_cyan()),
-                c @ 's' => write!(f, "{}", c.bright_purple()),
+                b'r' => optionally_vector_color!(f, BrightYellow, [&[*permission]]),
+                b'w' => optionally_vector_color!(f, BrightRed, [&[*permission]]),
+                b'x' => optionally_vector_color!(f, BrightGreen, [&[*permission]]),
+                b'-' => optionally_vector_color!(f, BrightBlack, [&[*permission]]),
+                b'u' => optionally_vector_color!(f, BrightBlue, [&[*permission]]),
+                b'g' => optionally_vector_color!(f, BrightCyan, [&[*permission]]),
+                b's' => optionally_vector_color!(f, BrightMagenta, [&[*permission]]),
                 _ => unreachable!(),
             }?;
         }
 
-        write!(f, "{}", ']'.bright_black())
-    }
-
-    fn show_plain(&self, _: &Arguments, f: &mut StdoutLock) -> std::io::Result<()> {
-        let permissions = self.file_permissions().map(|s| s.map(|c| c as u8));
-        let permissions = if self.extended { permissions.as_flattened() } else { permissions[1 ..].as_flattened() };
-
-        optionally_vector!(f, [&[b'[', self.file_type() as u8], permissions, b"]"])
+        optionally_vector_color!(f, BrightBlack, [b"]"])
     }
 }

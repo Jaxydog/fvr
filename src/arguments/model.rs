@@ -16,11 +16,9 @@
 
 //! Defines the command's argument data types.
 
-use std::cmp::Ordering;
 use std::path::Path;
 
-/// A function used to sort entries.
-type SortingFunctionInner = Box<dyn for<'a> Fn(&'a Path, &'a Path) -> Ordering>;
+use crate::files::sort::Sort;
 
 /// The program's command-line arguments.
 #[derive(Default)]
@@ -144,7 +142,7 @@ pub struct ListArguments {
     /// Whether to show hidden files.
     pub show_hidden: bool,
     /// The preferred sorting function.
-    pub sorting: Option<SortingFunction>,
+    pub sorting: Option<SortOrder>,
     /// The preferred mode visibility.
     pub mode: ModeVisibility,
 }
@@ -157,7 +155,7 @@ pub struct TreeArguments {
     /// Whether to show hidden files.
     pub show_hidden: bool,
     /// The preferred sorting function.
-    pub sorting: Option<SortingFunction>,
+    pub sorting: Option<SortOrder>,
 }
 
 /// The paths to list.
@@ -202,28 +200,78 @@ impl Paths {
     }
 }
 
-/// An entry sorting function.
-#[repr(transparent)]
-pub struct SortingFunction {
-    /// The inner function.
-    inner: SortingFunctionInner,
+/// Describes how entries should be sorted.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SortOrder {
+    /// Alphabetically.
+    Name,
+    /// Creation date.
+    Created,
+    /// Modification date.
+    Modified,
+    /// Hidden files.
+    Hidden,
+    /// Directories.
+    Directories,
+    /// Files.
+    Files,
+    /// Symbolic links.
+    Symlinks,
+    /// Reversed order.
+    Reverse(Box<Self>),
+    /// Chained order, preferring the left-most order.
+    Then(Box<(Self, Self)>),
 }
 
-impl SortingFunction {
-    /// Creates a new [`SortingFunction`].
-    pub fn new(f: impl for<'a> Fn(&'a Path, &'a Path) -> Ordering + 'static) -> Self {
-        Self { inner: Box::from(f) }
-    }
-
-    /// Returns a reference to the inner function.
-    pub fn get(&self) -> &impl for<'a> Fn(&'a Path, &'a Path) -> Ordering {
-        &self.inner
-    }
-
-    /// Returns the inner function.
+impl SortOrder {
+    /// Chains this order with another, preferring this ordering.
+    #[inline]
     #[must_use]
-    pub fn unpack(self) -> SortingFunctionInner {
-        self.inner
+    pub fn then(self, other: Self) -> Self {
+        Self::Then(Box::new((self, other)))
+    }
+
+    /// Reverses the ordering of this sort.
+    #[inline]
+    #[must_use]
+    pub fn reverse(self) -> Self {
+        match self {
+            Self::Reverse(sort) => *sort,
+            sort => Self::Reverse(Box::new(sort)),
+        }
+    }
+
+    /// Returns a reference to the most recent [`SortOrder`].
+    #[must_use]
+    pub fn top(&self) -> &Self {
+        match self {
+            Self::Then(v) => v.1.top(),
+            _ => self,
+        }
+    }
+
+    /// Compiles this [`SortOrder`] into a valid [`Sort`] implementation.
+    #[inline]
+    pub fn compile(&self) -> impl Sort {
+        use crate::files::sort::{by, extract, try_extract};
+
+        by(move |lhs, rhs| match self {
+            Self::Name => extract(|v, _| v.as_os_str().to_ascii_lowercase()).sort(lhs, rhs),
+            Self::Created => try_extract(|_, v| v.created()).sort(lhs, rhs),
+            Self::Modified => try_extract(|_, v| v.modified()).sort(lhs, rhs),
+            Self::Hidden => extract(|v, _| crate::files::is_hidden(v)).reverse().sort(lhs, rhs),
+            Self::Directories => extract(|_, d| d.is_dir()).reverse().sort(lhs, rhs),
+            Self::Files => extract(|_, d| d.is_file()).reverse().sort(lhs, rhs),
+            Self::Symlinks => extract(|_, d| d.is_symlink()).reverse().sort(lhs, rhs),
+            Self::Reverse(v) => v.compile().reverse().sort(lhs, rhs),
+            Self::Then(orders) => orders.0.compile().then(orders.1.compile()).sort(lhs, rhs),
+        })
+    }
+}
+
+impl Default for SortOrder {
+    fn default() -> Self {
+        Self::Directories.then(Self::Name)
     }
 }
 
