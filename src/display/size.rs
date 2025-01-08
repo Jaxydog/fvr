@@ -16,7 +16,6 @@
 
 //! Implements entry file size displays.
 
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
 
@@ -126,7 +125,7 @@ impl Size {
 
 impl Show for Size {
     fn show_plain(&self, _: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+        if entry.is_dir() {
             return match self.visibility {
                 SizeVisibility::Hide => unreachable!(),
                 SizeVisibility::Simple => {
@@ -176,7 +175,7 @@ impl Show for Size {
     }
 
     fn show_color(&self, _: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+        if entry.is_dir() {
             return match self.visibility {
                 SizeVisibility::Hide => unreachable!(),
                 SizeVisibility::Simple => {

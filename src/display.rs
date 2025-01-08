@@ -43,6 +43,23 @@ pub struct ShowData<'p> {
     pub depth: Option<usize>,
 }
 
+impl ShowData<'_> {
+    /// Returns `true` if this [`ShowData`] represents a directory.
+    pub fn is_dir(&self) -> bool {
+        self.data.map_or_else(|| self.path.is_dir(), Metadata::is_dir)
+    }
+
+    /// Returns `true` if this [`ShowData`] represents a file.
+    pub fn is_file(&self) -> bool {
+        self.data.map_or_else(|| self.path.is_file(), Metadata::is_file)
+    }
+
+    /// Returns `true` if this [`ShowData`] represents a symbolic link.
+    pub fn is_symlink(&self) -> bool {
+        self.data.map_or_else(|| self.path.is_symlink(), Metadata::is_symlink)
+    }
+}
+
 /// A value that should be shown to the terminal.
 pub trait Show {
     /// Outputs this value into the given output stream.

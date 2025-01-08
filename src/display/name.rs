@@ -16,7 +16,6 @@
 
 //! Implements entry file name displays.
 
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 
 use super::{Show, ShowData};
@@ -58,7 +57,7 @@ impl Show for Name {
                 n if n > 0 || depth != 0 => PIPE_BRIDGE_V,
                 _ => b"",
             };
-            let bridge = if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+            let bridge = if entry.is_dir() && std::fs::read_dir(entry.path)?.next().is_some() {
                 PIPE_BRIDGE_H
             } else {
                 PIPE_HORIZONTAL
@@ -74,16 +73,16 @@ impl Show for Name {
         };
 
         let executable = entry.data.is_some_and(is_executable);
-        let additional = if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+        let additional = if entry.is_dir() {
             Some::<&[u8]>(b"/")
-        } else if entry.data.map_or_else(|| entry.path.is_file(), Metadata::is_file) && executable {
+        } else if entry.is_file() && executable {
             Some::<&[u8]>(b"*")
         } else {
             None
         }
         .unwrap_or(&[]);
 
-        if self.resolve_symlinks && entry.data.map_or_else(|| entry.path.is_symlink(), Metadata::is_symlink) {
+        if self.resolve_symlinks && entry.is_symlink() {
             let resolved = std::fs::read_link(entry.path)?;
             let metadata = std::fs::symlink_metadata(&resolved).ok();
 
@@ -109,7 +108,7 @@ impl Show for Name {
                 n if n > 0 || depth != 0 => PIPE_BRIDGE_V,
                 _ => b"",
             };
-            let bridge = if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+            let bridge = if entry.is_dir() && std::fs::read_dir(entry.path)?.next().is_some() {
                 PIPE_BRIDGE_H
             } else {
                 PIPE_HORIZONTAL
@@ -127,7 +126,7 @@ impl Show for Name {
         let executable = entry.data.is_some_and(is_executable);
         let hidden = is_hidden(entry.path);
 
-        if entry.data.map_or_else(|| entry.path.is_symlink(), Metadata::is_symlink) {
+        if entry.is_symlink() {
             if hidden {
                 optionally_vector_color!(f, Cyan, [file_name.as_encoded_bytes()])?;
             } else {
@@ -151,13 +150,13 @@ impl Show for Name {
             }
 
             Ok(())
-        } else if entry.data.map_or_else(|| entry.path.is_dir(), Metadata::is_dir) {
+        } else if entry.is_dir() {
             if hidden {
                 optionally_vector_color!(f, Blue, [file_name.as_encoded_bytes(), b"/"])
             } else {
                 optionally_vector_color!(f, BrightBlue, [file_name.as_encoded_bytes(), b"/"])
             }
-        } else if entry.data.map_or_else(|| entry.path.is_file(), Metadata::is_file) && executable {
+        } else if entry.is_file() && executable {
             if hidden {
                 optionally_vector_color!(f, Green, [file_name.as_encoded_bytes(), b"*"])
             } else {
