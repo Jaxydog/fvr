@@ -148,6 +148,10 @@ pub struct ListArguments {
     pub mode: ModeVisibility,
     /// The preferred size visibility.
     pub size: SizeVisibility,
+    /// The preferred creation date visibility.
+    pub created: TimeVisibility,
+    /// The preferred modification date visibility.
+    pub modified: TimeVisibility,
 }
 
 /// The program's command-line arguments for the tree sub-command.
@@ -281,54 +285,6 @@ impl Default for SortOrder {
     }
 }
 
-/// Determines whether to display file sizes.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SizeVisibility {
-    /// Files sizes are not rendered.
-    #[default]
-    Hide,
-    /// Output the number of bytes.
-    Basic,
-    /// Output the size in base 2.
-    Base2,
-    /// Output the size in base 10.
-    Base10,
-}
-
-impl SizeVisibility {
-    /// Returns `true` if the size visibility is [`Hidden`].
-    ///
-    /// [`Hidden`]: SizeVisibility::Hidden
-    #[must_use]
-    pub const fn is_hidden(&self) -> bool {
-        matches!(self, Self::Hide)
-    }
-
-    /// Returns `true` if the size visibility is [`Basic`].
-    ///
-    /// [`Basic`]: SizeVisibility::Basic
-    #[must_use]
-    pub const fn is_basic(&self) -> bool {
-        matches!(self, Self::Basic)
-    }
-
-    /// Returns `true` if the size visibility is [`Base2`].
-    ///
-    /// [`Base2`]: SizeVisibility::Base2
-    #[must_use]
-    pub const fn is_base2(&self) -> bool {
-        matches!(self, Self::Base2)
-    }
-
-    /// Returns `true` if the size visibility is [`Base10`].
-    ///
-    /// [`Base10`]: SizeVisibility::Base10
-    #[must_use]
-    pub const fn is_base10(&self) -> bool {
-        matches!(self, Self::Base10)
-    }
-}
-
 /// Determines whether to display an entry's Unix file mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ModeVisibility {
@@ -364,5 +320,101 @@ impl ModeVisibility {
     #[must_use]
     pub const fn is_extended(&self) -> bool {
         matches!(self, Self::Extended)
+    }
+}
+
+/// Determines whether to display file sizes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SizeVisibility {
+    /// Files sizes are not rendered.
+    #[default]
+    Hide,
+    /// Output the number of bytes.
+    Basic,
+    /// Output the size in base 2.
+    Base2,
+    /// Output the size in base 10.
+    Base10,
+}
+
+impl SizeVisibility {
+    /// Returns `true` if the size visibility is [`Hidden`].
+    ///
+    /// [`Hidden`]: SizeVisibility::Hidden
+    #[must_use]
+    pub const fn is_hide(&self) -> bool {
+        matches!(self, Self::Hide)
+    }
+
+    /// Returns `true` if the size visibility is [`Basic`].
+    ///
+    /// [`Basic`]: SizeVisibility::Basic
+    #[must_use]
+    pub const fn is_basic(&self) -> bool {
+        matches!(self, Self::Basic)
+    }
+
+    /// Returns `true` if the size visibility is [`Base2`].
+    ///
+    /// [`Base2`]: SizeVisibility::Base2
+    #[must_use]
+    pub const fn is_base2(&self) -> bool {
+        matches!(self, Self::Base2)
+    }
+
+    /// Returns `true` if the size visibility is [`Base10`].
+    ///
+    /// [`Base10`]: SizeVisibility::Base10
+    #[must_use]
+    pub const fn is_base10(&self) -> bool {
+        matches!(self, Self::Base10)
+    }
+}
+
+/// Determines whether to display dates.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TimeVisibility {
+    /// Dates are not rendered.
+    #[default]
+    Hide,
+    /// Display in a simple format.
+    Simple,
+    /// Display in RFC-3339 format.
+    Rfc3339,
+    /// Display in ISO-8601 format.
+    Iso8601,
+}
+
+impl TimeVisibility {
+    /// Returns `true` if the time visibility is [`Hide`].
+    ///
+    /// [`Hide`]: ModifiedVisibility::Hide
+    #[must_use]
+    pub const fn is_hide(&self) -> bool {
+        matches!(self, Self::Hide)
+    }
+
+    /// Returns `true` if the time visibility is [`Simple`].
+    ///
+    /// [`Simple`]: ModifiedVisibility::Simple
+    #[must_use]
+    pub const fn is_simple(&self) -> bool {
+        matches!(self, Self::Simple)
+    }
+
+    /// Returns `true` if the time visibility is [`Rfc3339`].
+    ///
+    /// [`Rfc3339`]: ModifiedVisibility::Rfc3339
+    #[must_use]
+    pub const fn is_rfc3339(&self) -> bool {
+        matches!(self, Self::Rfc3339)
+    }
+
+    /// Returns `true` if the time visibility is [`Iso8601`].
+    ///
+    /// [`Iso8601`]: TimeVisibility::Iso8601
+    #[must_use]
+    pub const fn is_iso8601(&self) -> bool {
+        matches!(self, Self::Iso8601)
     }
 }

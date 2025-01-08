@@ -33,4 +33,5 @@ itoa = "~1.0"
 owo-colors = "~4.1"
 ryu = "~1.0"
 supports-color = "~3.0"
+time = { version = "~0.3", features = ["formatting", "local-offset", "macros"] }
 thiserror = "~2.0"

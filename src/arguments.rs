@@ -19,7 +19,7 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use model::{ModeVisibility, SizeVisibility, SortOrder};
+use model::{ModeVisibility, SizeVisibility, SortOrder, TimeVisibility};
 
 use self::model::{Arguments, ColorChoice, ListArguments, SubCommand, TreeArguments};
 use self::parse::{Argument, Parser};
@@ -55,7 +55,12 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]));
     const SIZE: Argument<'_> = Argument::new("size", "Determines whether to display an entry's file size")
         .short('s')
-        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]));
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "basic", "base-2", "base-10"]));
+    const CREATED: Argument<'_> = Argument::new("created", "Determines whether to display an entry's creation date")
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
+    const MODIFIED: Argument<'_> =
+        Argument::new("modified", "Determines whether to display an entry's modification date")
+            .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
 
     Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -63,7 +68,7 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .sub_commands(&[
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, SORT, MODE, SIZE]),
+                .arguments(&[HELP, COLOR, ALL, SORT, MODE, SIZE, CREATED, MODIFIED]),
             Command::new("tree", "List the contents of directories in a tree-based view")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
                 .arguments(&[HELP, COLOR, ALL, SORT]),
@@ -146,6 +151,12 @@ where
         }
         Short('s') | Long("size") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_size(arguments, parser)
+        }
+        Long("created") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+            self::parse_time(arguments, parser, "created")
+        }
+        Long("modified") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+            self::parse_time(arguments, parser, "modified")
         }
         Positional(value) => self::parse_positional(arguments, value),
         _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
@@ -319,6 +330,39 @@ where
         "base-10" => SizeVisibility::Base10,
         _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid size visibility")),
     };
+
+    None
+}
+
+/// Parses the created and/or modified command-line argument.
+fn parse_time<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>, set: &str) -> Option<ParseResult>
+where
+    I: Iterator<Item = &'p str>,
+{
+    let Some(choice) = (match parser.next_value() {
+        Ok(choice) => choice,
+        Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
+    }) else {
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected time visibility"));
+    };
+
+    let choice = match choice {
+        "hide" => TimeVisibility::Hide,
+        "simple" => TimeVisibility::Simple,
+        "rfc3339" => TimeVisibility::Rfc3339,
+        "iso8601" => TimeVisibility::Iso8601,
+        _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid time visibility")),
+    };
+
+    let Some(SubCommand::List(ListArguments { modified, created, .. })) = arguments.command.as_mut() else {
+        unreachable!();
+    };
+
+    match set {
+        "created" => *created = choice,
+        "modified" => *modified = choice,
+        _ => unreachable!(),
+    }
 
     None
 }

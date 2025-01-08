@@ -16,12 +16,14 @@
 
 //! Implements the list sub-command.
 
+use std::fs::Metadata;
 use std::io::Write;
 
 use crate::arguments::model::{Arguments, ModeVisibility, SubCommand};
 use crate::display::mode::Mode;
 use crate::display::name::Name;
 use crate::display::size::Size;
+use crate::display::time::Time;
 use crate::display::{Show, ShowData};
 use crate::files::is_hidden;
 
@@ -43,7 +45,11 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         ModeVisibility::Show => Some(Mode::new(false)),
         ModeVisibility::Extended => Some(Mode::new(true)),
     };
-    let size_display = (!list_arguments.size.is_hidden()).then(|| Size::new(list_arguments.size));
+    let size_display = (!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size));
+    let created_display =
+        (!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created));
+    let modified_display =
+        (!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified));
 
     let f = &mut std::io::stdout().lock();
 
@@ -72,6 +78,18 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
             if let Some(size_display) = size_display {
                 size_display.show(arguments, f, entry)?;
+
+                f.write_all(b" ")?;
+            }
+
+            if let Some(created_display) = created_display {
+                created_display.show(arguments, f, entry)?;
+
+                f.write_all(b" ")?;
+            }
+
+            if let Some(modified_display) = modified_display {
+                modified_display.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }
