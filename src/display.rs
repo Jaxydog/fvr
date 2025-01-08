@@ -26,6 +26,7 @@ pub mod mode;
 pub mod name;
 pub mod size;
 pub mod time;
+pub mod user;
 
 /// The data provided to a [`Show`] call.
 #[derive(Clone, Copy, Debug)]

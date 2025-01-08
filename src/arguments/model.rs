@@ -137,6 +137,7 @@ impl SubCommand {
 
 /// The program's command-line arguments for the list sub-command.
 #[derive(Default)]
+#[expect(clippy::struct_excessive_bools, reason = "such is the nature of command-line flags")]
 pub struct ListArguments {
     /// The paths to list.
     pub paths: Paths,
@@ -154,6 +155,10 @@ pub struct ListArguments {
     pub created: TimeVisibility,
     /// The preferred modification date visibility.
     pub modified: TimeVisibility,
+    /// Whether to show owner users.
+    pub user: bool,
+    /// Whether to show owner groups.
+    pub group: bool,
 }
 
 /// The program's command-line arguments for the tree sub-command.

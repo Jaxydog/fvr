@@ -63,6 +63,8 @@ pub const SCHEMA: self::schema::Command<'static> = {
     const MODIFIED: Argument<'_> =
         Argument::new("modified", "Determines whether to display an entry's modification date")
             .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
+    const USER: Argument<'_> = Argument::new("user", "Show the username of each entry's owner").short('u');
+    const GROUP: Argument<'_> = Argument::new("group", "Show the group name of each entry's owner").short('g');
 
     Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -70,7 +72,7 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .sub_commands(&[
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT, MODE, SIZE, CREATED, MODIFIED]),
+                .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT, MODE, SIZE, CREATED, MODIFIED, USER, GROUP]),
             Command::new("tree", "List the contents of directories in a tree-based view")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
                 .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT]),
@@ -160,6 +162,12 @@ where
         }
         Long("modified") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, "modified")
+        }
+        Short('u') | Long("user") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+            self::parse_user(arguments)
+        }
+        Short('g') | Long("group") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+            self::parse_group(arguments)
         }
         Positional(value) => self::parse_positional(arguments, value),
         _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
@@ -377,6 +385,30 @@ where
         "created" => *created = choice,
         "modified" => *modified = choice,
         _ => unreachable!(),
+    }
+
+    None
+}
+
+/// Parses the user command-line argument.
+fn parse_user(arguments: &mut Arguments) -> Option<ParseResult> {
+    let Some(command) = arguments.command.as_mut() else { unreachable!() };
+
+    match command {
+        SubCommand::List(arguments) => arguments.user = true,
+        SubCommand::Tree(_) => unreachable!(),
+    }
+
+    None
+}
+
+/// Parses the group command-line argument.
+fn parse_group(arguments: &mut Arguments) -> Option<ParseResult> {
+    let Some(command) = arguments.command.as_mut() else { unreachable!() };
+
+    match command {
+        SubCommand::List(arguments) => arguments.group = true,
+        SubCommand::Tree(_) => unreachable!(),
     }
 
     None

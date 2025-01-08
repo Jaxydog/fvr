@@ -24,7 +24,7 @@ use crate::arguments::model::Arguments;
 use crate::files::{is_executable, is_hidden};
 use crate::{optionally_vector, optionally_vector_color};
 
-/// Renders a file entry's Unix mode.
+/// Renders a file entry's name.
 #[must_use = "render implementations do nothing unless used"]
 #[derive(Clone, Copy, Debug)]
 pub struct Name {
@@ -99,7 +99,7 @@ impl Show for Name {
                 let metadata = std::fs::symlink_metadata(&resolved).ok();
 
                 if resolved.try_exists()? {
-                    optionally_vector_color!(f, BrightRed, [b" -> "])?;
+                    optionally_vector_color!(f, BrightBlack, [b" -> "])?;
                 } else {
                     optionally_vector_color!(f, BrightRed, [b" ~> "])?;
                 };

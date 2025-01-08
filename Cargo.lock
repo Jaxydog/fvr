@@ -21,6 +21,7 @@ dependencies = [
  "supports-color",
  "thiserror",
  "time",
+ "uzers",
 ]
 
 [[package]]
@@ -190,3 +191,12 @@ name = "unicode-ident"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+
+[[package]]
+name = "uzers"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4df81ff504e7d82ad53e95ed1ad5b72103c11253f39238bcc0235b90768a97dd"
+dependencies = [
+ "libc",
+]

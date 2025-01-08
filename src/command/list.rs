@@ -24,6 +24,7 @@ use crate::display::mode::Mode;
 use crate::display::name::Name;
 use crate::display::size::Size;
 use crate::display::time::Time;
+use crate::display::user::{Group, User};
 use crate::display::{Show, ShowData};
 use crate::files::is_hidden;
 
@@ -39,17 +40,19 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sorter = list_arguments.sorting.clone().unwrap_or_default();
     let sorter = sorter.compile();
 
-    let name_display = Name::new(list_arguments.resolve_symlinks, true);
-    let mode_display = match list_arguments.mode {
+    let show_name = Name::new(list_arguments.resolve_symlinks, true);
+    let show_mode = match list_arguments.mode {
         ModeVisibility::Hide => None,
         ModeVisibility::Show => Some(Mode::new(false)),
         ModeVisibility::Extended => Some(Mode::new(true)),
     };
-    let size_display = (!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size));
-    let created_display =
+    let show_size = (!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size));
+    let show_created =
         (!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created));
-    let modified_display =
+    let show_modified =
         (!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified));
+    let show_user = list_arguments.user.then_some(User);
+    let show_group = list_arguments.group.then_some(Group);
 
     let f = &mut std::io::stdout().lock();
 
@@ -62,7 +65,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
                 f.write_all(b"\n")?;
             }
 
-            name_display.show(arguments, f, root_entry)?;
+            show_name.show(arguments, f, root_entry)?;
 
             f.write_all(b":\n")?;
         }
@@ -70,31 +73,43 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         crate::files::visit(path, &filter, &sorter, |path, data, remaining| {
             let entry = ShowData { path, data: Some(data), remaining, depth: None };
 
-            if let Some(mode_display) = mode_display {
-                mode_display.show(arguments, f, entry)?;
+            if let Some(mode) = show_mode {
+                mode.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            if let Some(size_display) = size_display {
-                size_display.show(arguments, f, entry)?;
+            if let Some(size) = show_size {
+                size.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            if let Some(created_display) = created_display {
-                created_display.show(arguments, f, entry)?;
+            if let Some(created) = show_created {
+                created.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            if let Some(modified_display) = modified_display {
-                modified_display.show(arguments, f, entry)?;
+            if let Some(modified) = show_modified {
+                modified.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            name_display.show(arguments, f, entry)?;
+            if let Some(user) = show_user {
+                user.show(arguments, f, entry)?;
+
+                f.write_all(b" ")?;
+            }
+
+            if let Some(group) = show_group {
+                group.show(arguments, f, entry)?;
+
+                f.write_all(b" ")?;
+            }
+
+            show_name.show(arguments, f, entry)?;
 
             f.write_all(b"\n")
         })?;
