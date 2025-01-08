@@ -62,7 +62,7 @@ impl Show for Time {
         let Some(modified) = entry.data.and_then(|v| (self.extract)(v).ok()) else {
             return match self.visibility {
                 TimeVisibility::Hide => unreachable!(),
-                TimeVisibility::Simple => optionally_vector!(f, [b"-", &[b' '; 15]]),
+                TimeVisibility::Simple => optionally_vector!(f, [b"-", &[b' '; 14]]),
                 _ => optionally_vector!(f, [b"-", &[b' '; 34]]),
             };
         };
