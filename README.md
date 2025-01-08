@@ -39,7 +39,30 @@ cp ./target/release/fvr <destination>
 
 ## Usage
 
-Coming soon to a 'README' file near you.
+fvr currently contains two sub-commands; `list` and `tree`.
+
+`list` prints the contents of any specified directories.
+`tree` prints the contents of any specified directories recursively as a tree.
+
+```
+$ fvr --help
+
+fvr v0.1.0
+  An implementation of the `ls` command-line application.
+
+Usage: fvr [SUBCOMMAND] [ARGUMENTS]
+
+Sub-commands:
+  list                           List the contents of directories
+  tree                           List the contents of directories in a tree-based view
+
+Arguments:
+  -h, --help                     Shows the command's usage
+  -V, --version                  Shows the command's version
+      --color [CHOICE]           Determines whether to output with color
+                                 - default: auto
+                                 - options: auto, always, never
+```
 
 ## License
 
