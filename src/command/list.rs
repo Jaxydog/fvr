@@ -40,19 +40,17 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sorter = list_arguments.sorting.clone().unwrap_or_default();
     let sorter = sorter.compile();
 
-    let displays: &[&dyn Show] = &[
-        &match list_arguments.mode {
-            ModeVisibility::Hide => None,
-            ModeVisibility::Show => Some(Mode::new(false)),
-            ModeVisibility::Extended => Some(Mode::new(true)),
-        },
-        &(!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size)),
-        &(!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created)),
-        &(!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified)),
-        &list_arguments.user.then_some(User),
-        &list_arguments.group.then_some(Group),
-        &Name::new(list_arguments.resolve_symlinks, true),
-    ];
+    let mode = &match list_arguments.mode {
+        ModeVisibility::Hide => None,
+        ModeVisibility::Show => Some(Mode::new(false)),
+        ModeVisibility::Extended => Some(Mode::new(true)),
+    };
+    let size = (!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size));
+    let created = (!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created));
+    let modified = (!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified));
+    let user = list_arguments.user.then_some(User);
+    let group = list_arguments.group.then_some(Group);
+    let name = Name::new(list_arguments.resolve_symlinks, true);
 
     let f = &mut std::io::stdout().lock();
 
@@ -73,7 +71,26 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         crate::files::visit(path, &filter, &sorter, |path, data, index, count| {
             let entry = ShowData { path, data: Some(data), index, count, depth: None };
 
-            displays.show(arguments, f, entry).and_then(|()| f.write_all(b"\n"))
+            if let Some(mode) = mode {
+                mode.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            }
+            if let Some(size) = size {
+                size.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            }
+            if let Some(created) = created {
+                created.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            }
+            if let Some(modified) = modified {
+                modified.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            }
+            if let Some(user) = user {
+                user.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            }
+            if let Some(group) = group {
+                group.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            }
+
+            name.show(arguments, f, entry).and_then(|()| f.write_all(b"\n"))
         })?;
     }
 

@@ -17,7 +17,7 @@
 //! Provides custom display implementations for various types of file entry data.
 
 use std::fs::Metadata;
-use std::io::{Result, StdoutLock, Write};
+use std::io::{Result, StdoutLock};
 use std::path::Path;
 
 use crate::arguments::model::{Arguments, ColorChoice};
@@ -79,7 +79,6 @@ pub trait Show {
             ColorChoice::Always => self.show_color(arguments, f, entry),
             ColorChoice::Never => self.show_plain(arguments, f, entry),
         }
-        .and_then(|()| f.write_all(b" "))
     }
 
     /// Outputs this value into the given output stream with no color.
@@ -95,64 +94,6 @@ pub trait Show {
     ///
     /// This function will return an error if the data could not be output.
     fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()>;
-}
-
-impl Show for [&dyn Show] {
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_plain(arguments, f, entry))
-    }
-
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_color(arguments, f, entry))
-    }
-}
-
-impl<T: Show> Show for Option<T> {
-    #[inline]
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.as_ref().map_or(Ok(()), |v| v.show_plain(arguments, f, entry))
-    }
-
-    #[inline]
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.as_ref().map_or(Ok(()), |v| v.show_color(arguments, f, entry))
-    }
-}
-
-impl<T: Show> Show for [T] {
-    #[inline]
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_plain(arguments, f, entry))
-    }
-
-    #[inline]
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        self.iter().try_for_each(|show| show.show_color(arguments, f, entry))
-    }
-}
-
-impl<T: Show> Show for &[T] {
-    #[inline]
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        <[T] as Show>::show_plain(self, arguments, f, entry)
-    }
-
-    #[inline]
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        <[T] as Show>::show_color(self, arguments, f, entry)
-    }
-}
-
-impl<T: Show> Show for &mut [T] {
-    #[inline]
-    fn show_plain(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        <[T] as Show>::show_plain(self, arguments, f, entry)
-    }
-
-    #[inline]
-    fn show_color(&self, arguments: &Arguments, f: &mut StdoutLock, entry: ShowData<'_>) -> Result<()> {
-        <[T] as Show>::show_color(self, arguments, f, entry)
-    }
 }
 
 /// Outputs the given list of slices using [`write_all_vectored`][0] if possible.
