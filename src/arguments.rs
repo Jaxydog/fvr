@@ -19,7 +19,7 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use model::{ModeVisibility, SortOrder};
+use model::{ModeVisibility, SizeVisibility, SortOrder};
 
 use self::model::{Arguments, ColorChoice, ListArguments, SubCommand, TreeArguments};
 use self::parse::{Argument, Parser};
@@ -37,20 +37,24 @@ pub const SCHEMA: self::schema::Command<'static> = {
     const COLOR: Argument<'_> = Argument::new("color", "Determines whether to output with color")
         .value(Value::new("CHOICE").required().default("auto").options(&["auto", "always", "never"]));
     const ALL: Argument<'_> = Argument::new("all", "Show all entries, including hidden entries").short('a');
-    const SORT: Argument<'_> = Argument::new("sort", "Determines the sorting order (comma separated)")
-        .short('s')
-        .value(Value::new("ORDER").required().list().default("name").options(&[
+    const SORT: Argument<'_> = Argument::new("sort", "Determines the sorting order (comma separated)").value(
+        Value::new("ORDER").required().list().default("name").options(&[
             "name",
             "created",
             "modified",
+            "size",
             "files",
             "symlinks",
             "directories",
             "hidden",
             "reverse-*",
-        ]));
+        ]),
+    );
     const MODE: Argument<'_> = Argument::new("mode", "Determines whether to display an entry's Unix mode flags")
         .short('m')
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]));
+    const SIZE: Argument<'_> = Argument::new("size", "Determines whether to display an entry's file size")
+        .short('s')
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]));
 
     Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
@@ -59,7 +63,7 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .sub_commands(&[
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, SORT, MODE]),
+                .arguments(&[HELP, COLOR, ALL, SORT, MODE, SIZE]),
             Command::new("tree", "List the contents of directories in a tree-based view")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
                 .arguments(&[HELP, COLOR, ALL, SORT]),
@@ -136,9 +140,12 @@ where
         Short('V') | Long("version") if arguments.command.is_none() => Some(self::parse_version()),
         Long("color") => self::parse_color(arguments, parser),
         Short('a') | Long("all") if arguments.command.is_some() => self::parse_all(arguments),
-        Short('s') | Long("sort") if arguments.command.is_some() => self::parse_sort(arguments, parser),
+        Long("sort") if arguments.command.is_some() => self::parse_sort(arguments, parser),
         Short('m') | Long("mode") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_mode(arguments, parser)
+        }
+        Short('s') | Long("size") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+            self::parse_size(arguments, parser)
         }
         Positional(value) => self::parse_positional(arguments, value),
         _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
@@ -245,6 +252,7 @@ where
             "name" => SortOrder::Name,
             "created" => SortOrder::Created,
             "modified" => SortOrder::Modified,
+            "size" => SortOrder::Size,
             "files" => SortOrder::Files,
             "symlinks" => SortOrder::Symlinks,
             "directories" => SortOrder::Directories,
@@ -285,6 +293,31 @@ where
         "show" => ModeVisibility::Show,
         "extended" => ModeVisibility::Extended,
         _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid mode visibility")),
+    };
+
+    None
+}
+
+/// Parses the size command-line argument.
+fn parse_size<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
+where
+    I: Iterator<Item = &'p str>,
+{
+    let Some(choice) = (match parser.next_value() {
+        Ok(choice) => choice,
+        Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
+    }) else {
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected size visibility"));
+    };
+
+    let Some(SubCommand::List(ListArguments { size, .. })) = arguments.command.as_mut() else { unreachable!() };
+
+    *size = match choice {
+        "hide" => SizeVisibility::Hide,
+        "basic" => SizeVisibility::Basic,
+        "base-2" => SizeVisibility::Base2,
+        "base-10" => SizeVisibility::Base10,
+        _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid size visibility")),
     };
 
     None

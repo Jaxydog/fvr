@@ -16,6 +16,7 @@
 
 //! Defines the command's argument data types.
 
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use crate::files::sort::Sort;
@@ -145,6 +146,8 @@ pub struct ListArguments {
     pub sorting: Option<SortOrder>,
     /// The preferred mode visibility.
     pub mode: ModeVisibility,
+    /// The preferred size visibility.
+    pub size: SizeVisibility,
 }
 
 /// The program's command-line arguments for the tree sub-command.
@@ -209,6 +212,8 @@ pub enum SortOrder {
     Created,
     /// Modification date.
     Modified,
+    /// File size.
+    Size,
     /// Hidden files.
     Hidden,
     /// Directories.
@@ -259,6 +264,7 @@ impl SortOrder {
             Self::Name => extract(|v, _| v.as_os_str().to_ascii_lowercase()).sort(lhs, rhs),
             Self::Created => try_extract(|_, v| v.created()).sort(lhs, rhs),
             Self::Modified => try_extract(|_, v| v.modified()).sort(lhs, rhs),
+            Self::Size => extract(|_, v| if v.is_dir() { 0 } else { v.size() }).reverse().sort(lhs, rhs),
             Self::Hidden => extract(|v, _| crate::files::is_hidden(v)).reverse().sort(lhs, rhs),
             Self::Directories => extract(|_, d| d.is_dir()).reverse().sort(lhs, rhs),
             Self::Files => extract(|_, d| d.is_file()).reverse().sort(lhs, rhs),
@@ -272,6 +278,54 @@ impl SortOrder {
 impl Default for SortOrder {
     fn default() -> Self {
         Self::Directories.then(Self::Name)
+    }
+}
+
+/// Determines whether to display file sizes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SizeVisibility {
+    /// Files sizes are not rendered.
+    #[default]
+    Hide,
+    /// Output the number of bytes.
+    Basic,
+    /// Output the size in base 2.
+    Base2,
+    /// Output the size in base 10.
+    Base10,
+}
+
+impl SizeVisibility {
+    /// Returns `true` if the size visibility is [`Hidden`].
+    ///
+    /// [`Hidden`]: SizeVisibility::Hidden
+    #[must_use]
+    pub const fn is_hidden(&self) -> bool {
+        matches!(self, Self::Hide)
+    }
+
+    /// Returns `true` if the size visibility is [`Basic`].
+    ///
+    /// [`Basic`]: SizeVisibility::Basic
+    #[must_use]
+    pub const fn is_basic(&self) -> bool {
+        matches!(self, Self::Basic)
+    }
+
+    /// Returns `true` if the size visibility is [`Base2`].
+    ///
+    /// [`Base2`]: SizeVisibility::Base2
+    #[must_use]
+    pub const fn is_base2(&self) -> bool {
+        matches!(self, Self::Base2)
+    }
+
+    /// Returns `true` if the size visibility is [`Base10`].
+    ///
+    /// [`Base10`]: SizeVisibility::Base10
+    #[must_use]
+    pub const fn is_base10(&self) -> bool {
+        matches!(self, Self::Base10)
     }
 }
 

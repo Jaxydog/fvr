@@ -21,6 +21,7 @@ use std::io::Write;
 use crate::arguments::model::{Arguments, ModeVisibility, SubCommand};
 use crate::display::mode::Mode;
 use crate::display::name::Name;
+use crate::display::size::Size;
 use crate::display::{Show, ShowData};
 use crate::files::is_hidden;
 
@@ -42,6 +43,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         ModeVisibility::Show => Some(Mode::new(false)),
         ModeVisibility::Extended => Some(Mode::new(true)),
     };
+    let size_display = (!list_arguments.size.is_hidden()).then(|| Size::new(list_arguments.size));
 
     let f = &mut std::io::stdout().lock();
 
@@ -64,6 +66,12 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
             if let Some(mode_display) = mode_display {
                 mode_display.show(arguments, f, entry)?;
+
+                f.write_all(b" ")?;
+            }
+
+            if let Some(size_display) = size_display {
+                size_display.show(arguments, f, entry)?;
 
                 f.write_all(b" ")?;
             }

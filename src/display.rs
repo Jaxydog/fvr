@@ -24,6 +24,7 @@ use crate::arguments::model::{Arguments, ColorChoice};
 
 pub mod mode;
 pub mod name;
+pub mod size;
 
 /// The data provided to a [`Show`] call.
 #[derive(Clone, Copy, Debug)]
