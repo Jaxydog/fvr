@@ -40,19 +40,19 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sorter = list_arguments.sorting.clone().unwrap_or_default();
     let sorter = sorter.compile();
 
-    let show_name = Name::new(list_arguments.resolve_symlinks, true);
-    let show_mode = match list_arguments.mode {
-        ModeVisibility::Hide => None,
-        ModeVisibility::Show => Some(Mode::new(false)),
-        ModeVisibility::Extended => Some(Mode::new(true)),
-    };
-    let show_size = (!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size));
-    let show_created =
-        (!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created));
-    let show_modified =
-        (!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified));
-    let show_user = list_arguments.user.then_some(User);
-    let show_group = list_arguments.group.then_some(Group);
+    let displays: &[&dyn Show] = &[
+        &match list_arguments.mode {
+            ModeVisibility::Hide => None,
+            ModeVisibility::Show => Some(Mode::new(false)),
+            ModeVisibility::Extended => Some(Mode::new(true)),
+        },
+        &(!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size)),
+        &(!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created)),
+        &(!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified)),
+        &list_arguments.user.then_some(User),
+        &list_arguments.group.then_some(Group),
+        &Name::new(list_arguments.resolve_symlinks, true),
+    ];
 
     let f = &mut std::io::stdout().lock();
 
@@ -65,7 +65,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
                 f.write_all(b"\n")?;
             }
 
-            show_name.show(arguments, f, root_entry)?;
+            Name::new(false, false).show(arguments, f, root_entry)?;
 
             f.write_all(b":\n")?;
         }
@@ -73,45 +73,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         crate::files::visit(path, &filter, &sorter, |path, data, remaining| {
             let entry = ShowData { path, data: Some(data), remaining, depth: None };
 
-            if let Some(mode) = show_mode {
-                mode.show(arguments, f, entry)?;
-
-                f.write_all(b" ")?;
-            }
-
-            if let Some(size) = show_size {
-                size.show(arguments, f, entry)?;
-
-                f.write_all(b" ")?;
-            }
-
-            if let Some(created) = show_created {
-                created.show(arguments, f, entry)?;
-
-                f.write_all(b" ")?;
-            }
-
-            if let Some(modified) = show_modified {
-                modified.show(arguments, f, entry)?;
-
-                f.write_all(b" ")?;
-            }
-
-            if let Some(user) = show_user {
-                user.show(arguments, f, entry)?;
-
-                f.write_all(b" ")?;
-            }
-
-            if let Some(group) = show_group {
-                group.show(arguments, f, entry)?;
-
-                f.write_all(b" ")?;
-            }
-
-            show_name.show(arguments, f, entry)?;
-
-            f.write_all(b"\n")
+            displays.show(arguments, f, entry).and_then(|()| f.write_all(b"\n"))
         })?;
     }
 
