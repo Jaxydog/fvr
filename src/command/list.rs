@@ -77,5 +77,5 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         })?;
     }
 
-    Ok(())
+    f.flush()
 }
