@@ -61,7 +61,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         Some(ModifiedSection { visibility: list_arguments.modified })
     };
     let user_section = list_arguments.user.then_some(UserSection);
-    let group_section = list_arguments.user.then_some(GroupSection);
+    let group_section = list_arguments.group.then_some(GroupSection);
     let name_section = NameSection { resolve_symlinks: list_arguments.resolve_symlinks, trim_paths: true };
 
     let f = &mut std::io::stdout().lock();
