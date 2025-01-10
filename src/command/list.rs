@@ -16,17 +16,17 @@
 
 //! Implements the list sub-command.
 
-use std::fs::Metadata;
 use std::io::Write;
+use std::rc::Rc;
 
 use crate::arguments::model::{Arguments, ModeVisibility, SubCommand};
-use crate::display::mode::Mode;
-use crate::display::name::Name;
-use crate::display::size::Size;
-use crate::display::time::Time;
-use crate::display::user::{Group, User};
-use crate::display::{Show, ShowData};
-use crate::files::is_hidden;
+use crate::files::{Entry, is_hidden};
+use crate::section::Section;
+use crate::section::mode::ModeSection;
+use crate::section::name::NameSection;
+use crate::section::size::SizeSection;
+use crate::section::time::{CreatedSection, ModifiedSection};
+use crate::section::user::{GroupSection, UserSection};
 
 /// Runs the command.
 ///
@@ -37,60 +37,70 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::List(list_arguments)) = arguments.command.as_ref() else { unreachable!() };
 
     let filter = crate::files::filter::by(|v, _| list_arguments.show_hidden || !is_hidden(v));
-    let sorter = list_arguments.sorting.clone().unwrap_or_default();
-    let sorter = sorter.compile();
+    let sort = list_arguments.sorting.clone().unwrap_or_default();
+    let sort = sort.compile();
 
-    let mode = &match list_arguments.mode {
+    let mode_section = match list_arguments.mode {
         ModeVisibility::Hide => None,
-        ModeVisibility::Show => Some(Mode::new(false)),
-        ModeVisibility::Extended => Some(Mode::new(true)),
+        ModeVisibility::Show => Some(ModeSection { extended: false }),
+        ModeVisibility::Extended => Some(ModeSection { extended: true }),
     };
-    let size = (!list_arguments.size.is_hide()).then(|| Size::new(list_arguments.size));
-    let created = (!list_arguments.created.is_hide()).then(|| Time::new(list_arguments.created, Metadata::created));
-    let modified = (!list_arguments.modified.is_hide()).then(|| Time::new(list_arguments.modified, Metadata::modified));
-    let user = list_arguments.user.then_some(User);
-    let group = list_arguments.group.then_some(Group);
-    let name = Name::new(list_arguments.resolve_symlinks, true);
+    let size_section = if list_arguments.size.is_hide() {
+        None //
+    } else {
+        Some(SizeSection { visibility: list_arguments.size })
+    };
+    let created_section = if list_arguments.created.is_hide() {
+        None
+    } else {
+        Some(CreatedSection { visibility: list_arguments.created })
+    };
+    let modified_section = if list_arguments.modified.is_hide() {
+        None
+    } else {
+        Some(ModifiedSection { visibility: list_arguments.modified })
+    };
+    let user_section = list_arguments.user.then_some(UserSection);
+    let group_section = list_arguments.user.then_some(GroupSection);
+    let name_section = NameSection { resolve_symlinks: list_arguments.resolve_symlinks, trim_paths: true };
 
     let f = &mut std::io::stdout().lock();
 
     for (index, path) in list_arguments.paths.get().enumerate() {
-        let count = list_arguments.paths.len();
-        let root_entry = ShowData { path, data: None, index, count, depth: None };
+        if index > 0 {
+            f.write_all(b"\n")?;
+        }
+
+        let data = std::fs::symlink_metadata(path).ok();
+        let entry = Rc::new(Entry::new(path, data.as_ref(), index, list_arguments.paths.len()));
 
         if list_arguments.paths.len() > 1 {
-            if index > 0 {
-                f.write_all(b"\n")?;
-            }
-
-            Name::new(false, false).show(arguments, f, root_entry)?;
+            NameSection { resolve_symlinks: false, trim_paths: true }.write(arguments.color, f, &[], &entry)?;
 
             f.write_all(b":\n")?;
         }
 
-        crate::files::visit(path, &filter, &sorter, |path, data, index, count| {
-            let entry = ShowData { path, data: Some(data), index, count, depth: None };
-
-            if let Some(mode) = mode {
-                mode.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+        crate::files::visit_entries(&entry, &filter, &sort, |parents, entry| {
+            if let Some(mode) = mode_section {
+                mode.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
             }
-            if let Some(size) = size {
-                size.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            if let Some(size) = size_section {
+                size.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
             }
-            if let Some(created) = created {
-                created.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            if let Some(created) = created_section {
+                created.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
             }
-            if let Some(modified) = modified {
-                modified.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            if let Some(modified) = modified_section {
+                modified.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
             }
-            if let Some(user) = user {
-                user.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            if let Some(user) = user_section {
+                user.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
             }
-            if let Some(group) = group {
-                group.show(arguments, f, entry).and_then(|()| f.write_all(b" "))?;
+            if let Some(group) = group_section {
+                group.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
             }
 
-            name.show(arguments, f, entry).and_then(|()| f.write_all(b"\n"))
+            name_section.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b"\n"))
         })?;
     }
 

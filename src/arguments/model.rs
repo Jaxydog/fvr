@@ -290,7 +290,7 @@ impl SortOrder {
 
 impl Default for SortOrder {
     fn default() -> Self {
-        Self::Directories.then(Self::Name)
+        Self::Directories.then(Self::Files).then(Self::Name)
     }
 }
 
@@ -347,19 +347,19 @@ pub enum SizeVisibility {
 }
 
 impl SizeVisibility {
-    /// Returns `true` if the size visibility is [`Hidden`].
+    /// Returns `true` if the size visibility is [`Hide`].
     ///
-    /// [`Hidden`]: SizeVisibility::Hidden
+    /// [`Hide`]: SizeVisibility::Hide
     #[must_use]
     pub const fn is_hide(&self) -> bool {
         matches!(self, Self::Hide)
     }
 
-    /// Returns `true` if the size visibility is [`Basic`].
+    /// Returns `true` if the size visibility is [`Simple`].
     ///
-    /// [`Basic`]: SizeVisibility::Basic
+    /// [`Simple`]: SizeVisibility::Simple
     #[must_use]
-    pub const fn is_basic(&self) -> bool {
+    pub const fn is_simple(&self) -> bool {
         matches!(self, Self::Simple)
     }
 

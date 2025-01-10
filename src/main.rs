@@ -34,8 +34,8 @@ use arguments::model::SubCommand;
 use self::arguments::ParseResult;
 
 pub mod arguments;
-pub mod display;
 pub mod files;
+pub mod section;
 
 /// Defines sub-command implementations.
 pub mod command {

@@ -17,11 +17,13 @@
 //! Implements the tree sub-command.
 
 use std::io::Write;
+use std::rc::Rc;
 
 use crate::arguments::model::{Arguments, SubCommand};
-use crate::display::name::Name;
-use crate::display::{Show, ShowData};
-use crate::files::is_hidden;
+use crate::files::{Entry, is_hidden};
+use crate::section::Section;
+use crate::section::name::NameSection;
+use crate::section::tree::TreeSection;
 
 /// Runs the command.
 ///
@@ -32,29 +34,32 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command.as_ref() else { unreachable!() };
 
     let filter = crate::files::filter::by(|v, _| tree_arguments.show_hidden || !is_hidden(v));
-    let sorter = tree_arguments.sorting.clone().unwrap_or_default();
-    let sorter = sorter.compile();
+    let sort = tree_arguments.sorting.clone().unwrap_or_default();
+    let sort = sort.compile();
 
-    let name = Name::new(tree_arguments.resolve_symlinks, true);
+    let name_section = NameSection { resolve_symlinks: tree_arguments.resolve_symlinks, trim_paths: true };
 
     let f = &mut std::io::stdout().lock();
 
     for (index, path) in tree_arguments.paths.get().enumerate() {
-        let count = tree_arguments.paths.len();
-        let root_entry = ShowData { path, data: None, index, count, depth: None };
-
         if index > 0 {
             f.write_all(b"\n")?;
         }
 
-        Name::new(false, true).show(arguments, f, root_entry)?;
+        let data = std::fs::symlink_metadata(path).ok();
+        let entry = Rc::new(Entry::new(path, data.as_ref(), index, tree_arguments.paths.len()));
 
-        f.write_all(b":\n")?;
+        TreeSection.write(arguments.color, f, &[], &entry)?;
+        NameSection { resolve_symlinks: false, trim_paths: true }.write(arguments.color, f, &[], &entry)?;
 
-        crate::files::visit_recursive(path, &filter, &sorter, 0, &mut |path, data, index, count, depth| {
-            let entry = ShowData { path, data: Some(data), index, count, depth: Some(depth) };
+        f.write_all(b"\n")?;
 
-            name.show(arguments, f, entry).and_then(|()| f.write_all(b"\n"))
+        crate::files::visit_entries_recursive(entry, &filter, &sort, &mut |parents, entry| {
+            TreeSection.write(arguments.color, f, parents, &entry)?;
+
+            name_section.write(arguments.color, f, parents, &entry)?;
+
+            f.write_all(b"\n")
         })?;
     }
 
