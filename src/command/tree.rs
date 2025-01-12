@@ -37,20 +37,20 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sort = tree_arguments.sorting.clone().unwrap_or_default();
     let sort = sort.compile();
 
-    let name_section = NameSection { resolve_symlinks: tree_arguments.resolve_symlinks, trim_paths: true };
+    let name_section = NameSection::new(true, tree_arguments.resolve_symlinks);
 
     let f = &mut std::io::stdout().lock();
 
     for (index, path) in tree_arguments.paths.get().enumerate() {
+        let data = std::fs::symlink_metadata(path).ok();
+        let entry = Rc::new(Entry::root(path, data.as_ref()));
+
         if index > 0 {
             f.write_all(b"\n")?;
         }
 
-        let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::root(path, data.as_ref()));
-
         TreeSection.write(arguments.color, f, &[], &entry)?;
-        NameSection { resolve_symlinks: false, trim_paths: true }.write(arguments.color, f, &[], &entry)?;
+        NameSection::new(true, false).write(arguments.color, f, &[], &entry)?;
 
         f.write_all(b"\n")?;
 

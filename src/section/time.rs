@@ -50,6 +50,14 @@ pub struct CreatedSection {
     pub visibility: TimeVisibility,
 }
 
+impl CreatedSection {
+    /// Creates a new [`CreatedSection`].
+    #[must_use]
+    pub const fn new(visibility: TimeVisibility) -> Self {
+        Self { visibility }
+    }
+}
+
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for CreatedSection {
     fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
@@ -98,6 +106,14 @@ impl Section for CreatedSection {
 pub struct ModifiedSection {
     /// Determines how the date is rendered.
     pub visibility: TimeVisibility,
+}
+
+impl ModifiedSection {
+    /// Creates a new [`ModifiedSection`].
+    #[must_use]
+    pub const fn new(visibility: TimeVisibility) -> Self {
+        Self { visibility }
+    }
 }
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]

@@ -141,6 +141,12 @@ impl ModeSection {
     /// The byte used to represent an unknown file type.
     pub const TYPE_UNKNOWN: u8 = b'?';
 
+    /// Creates a new [`ModeSection`].
+    #[must_use]
+    pub const fn new(extended: bool) -> Self {
+        Self { extended }
+    }
+
     /// Returns a series of bytes that represent the file type for the given mode.
     #[must_use]
     pub const fn get_type(mode: u32) -> u8 {

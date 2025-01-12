@@ -37,6 +37,12 @@ impl NameSection {
     pub const DIR_SUFFIX: &[u8] = b"/";
     /// The suffix used for executable files.
     pub const EXE_SUFFIX: &[u8] = b"*";
+
+    /// Creates a new [`NameSection`].
+    #[must_use]
+    pub const fn new(trim_paths: bool, resolve_symlinks: bool) -> Self {
+        Self { trim_paths, resolve_symlinks }
+    }
 }
 
 impl Section for NameSection {

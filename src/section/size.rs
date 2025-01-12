@@ -140,6 +140,12 @@ impl SizeSection {
     pub const WIDTH_BASE_2: usize = 10;
     /// The width of a simple size output.
     pub const WIDTH_SIMPLE: usize = 20;
+
+    /// Creates a new [`SizeSection`].
+    #[must_use]
+    pub const fn new(visibility: SizeVisibility) -> Self {
+        Self { visibility }
+    }
 }
 
 impl Section for SizeSection {

@@ -19,7 +19,7 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use crate::arguments::model::{Arguments, ModeVisibility, SubCommand};
+use crate::arguments::model::{Arguments, SubCommand};
 use crate::files::{Entry, is_hidden};
 use crate::section::Section;
 use crate::section::mode::ModeSection;
@@ -40,67 +40,65 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sort = list_arguments.sorting.clone().unwrap_or_default();
     let sort = sort.compile();
 
-    let mode_section = match list_arguments.mode {
-        ModeVisibility::Hide => None,
-        ModeVisibility::Show => Some(ModeSection { extended: false }),
-        ModeVisibility::Extended => Some(ModeSection { extended: true }),
-    };
-    let size_section = if list_arguments.size.is_hide() {
-        None //
-    } else {
-        Some(SizeSection { visibility: list_arguments.size })
-    };
-    let created_section = if list_arguments.created.is_hide() {
-        None
-    } else {
-        Some(CreatedSection { visibility: list_arguments.created })
-    };
-    let modified_section = if list_arguments.modified.is_hide() {
-        None
-    } else {
-        Some(ModifiedSection { visibility: list_arguments.modified })
-    };
+    let mode_section = (!list_arguments.mode.is_hide()).then(|| ModeSection::new(list_arguments.mode.is_extended()));
+    let size_section = (!list_arguments.size.is_hide()).then(|| SizeSection::new(list_arguments.size));
+    let created_section = (!list_arguments.created.is_hide()).then(|| CreatedSection::new(list_arguments.created));
+    let modified_section = (!list_arguments.modified.is_hide()).then(|| ModifiedSection::new(list_arguments.modified));
     let user_section = list_arguments.user.then_some(UserSection);
     let group_section = list_arguments.group.then_some(GroupSection);
-    let name_section = NameSection { resolve_symlinks: list_arguments.resolve_symlinks, trim_paths: true };
+    let name_section = NameSection::new(true, list_arguments.resolve_symlinks);
 
     let f = &mut std::io::stdout().lock();
 
     for (index, path) in list_arguments.paths.get().enumerate() {
-        if index > 0 {
-            f.write_all(b"\n")?;
-        }
-
         let data = std::fs::symlink_metadata(path).ok();
         let entry = Rc::new(Entry::new(path, data.as_ref(), index, list_arguments.paths.len()));
 
         if list_arguments.paths.len() > 1 {
-            NameSection { resolve_symlinks: false, trim_paths: true }.write(arguments.color, f, &[], &entry)?;
+            if index > 0 {
+                f.write_all(b"\n")?;
+            }
+
+            NameSection::new(true, false).write(arguments.color, f, &[], &entry)?;
 
             f.write_all(b":\n")?;
         }
 
         crate::files::visit_entries(&entry, &filter, &sort, |parents, entry| {
             if let Some(mode) = mode_section {
-                mode.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
+                mode.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
             }
             if let Some(size) = size_section {
-                size.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
+                size.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
             }
             if let Some(created) = created_section {
-                created.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
+                created.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
             }
             if let Some(modified) = modified_section {
-                modified.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
+                modified.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
             }
             if let Some(user) = user_section {
-                user.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
+                user.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
             }
             if let Some(group) = group_section {
-                group.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b" "))?;
+                group.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
             }
 
-            name_section.write(arguments.color, f, parents, &entry).and_then(|()| f.write_all(b"\n"))
+            name_section.write(arguments.color, f, parents, &entry)?;
+
+            f.write_all(b"\n")
         })?;
     }
 
