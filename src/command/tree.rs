@@ -47,7 +47,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         }
 
         let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::new(path, data.as_ref(), index, tree_arguments.paths.len()));
+        let entry = Rc::new(Entry::root(path, data.as_ref()));
 
         TreeSection.write(arguments.color, f, &[], &entry)?;
         NameSection { resolve_symlinks: false, trim_paths: true }.write(arguments.color, f, &[], &entry)?;
