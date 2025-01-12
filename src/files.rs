@@ -246,7 +246,7 @@ where
                 break;
             }
             (_, None) => components.push(Component::ParentDir),
-            (Some(root), Some(path)) if components.is_empty() && root == path => continue,
+            (Some(root), Some(path)) if components.is_empty() && root == path => {}
             (Some(Component::CurDir), Some(path)) => components.push(path),
             (Some(Component::ParentDir), Some(_)) => return None,
             (Some(_), Some(path)) => {
