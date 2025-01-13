@@ -227,14 +227,14 @@ where
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
-        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected color choice"));
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing color choice"));
     };
 
     arguments.color = match choice {
         "auto" => ColorChoice::Auto,
         "always" => ColorChoice::Always,
         "never" => ColorChoice::Never,
-        _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid color choice")),
+        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid color choice '{v}'"))),
     };
 
     None
@@ -279,7 +279,7 @@ where
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
-        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected sort ordering string"));
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing sort order"));
     };
 
     *sorting = None;
@@ -294,7 +294,7 @@ where
             "symlinks" => SortOrder::Symlinks,
             "directories" => SortOrder::Directories,
             "hidden" => SortOrder::Hidden,
-            _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid ordering string")),
+            v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid sort order '{v}'"))),
         };
 
         if string.starts_with("reverse-") {
@@ -320,7 +320,7 @@ where
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
-        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected mode visibility"));
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing mode visibility"));
     };
 
     let Some(SubCommand::List(ListArguments { mode, .. })) = arguments.command.as_mut() else { unreachable!() };
@@ -329,7 +329,7 @@ where
         "hide" => ModeVisibility::Hide,
         "show" => ModeVisibility::Show,
         "extended" => ModeVisibility::Extended,
-        _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid mode visibility")),
+        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid mode visibility '{v}'"))),
     };
 
     None
@@ -344,7 +344,7 @@ where
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
-        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected size visibility"));
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing size visibility"));
     };
 
     let Some(SubCommand::List(ListArguments { size, .. })) = arguments.command.as_mut() else { unreachable!() };
@@ -354,7 +354,7 @@ where
         "basic" => SizeVisibility::Simple,
         "base-2" => SizeVisibility::Base2,
         "base-10" => SizeVisibility::Base10,
-        _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid size visibility")),
+        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid size visibility '{v}'"))),
     };
 
     None
@@ -369,7 +369,7 @@ where
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
-        return Some(self::exit_and_print(ERROR_CLI_USAGE, "expected time visibility"));
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing time visibility"));
     };
 
     let choice = match choice {
@@ -377,7 +377,7 @@ where
         "simple" => TimeVisibility::Simple,
         "rfc3339" => TimeVisibility::Rfc3339,
         "iso8601" => TimeVisibility::Iso8601,
-        _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, "invalid time visibility")),
+        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid time visibility '{v}'"))),
     };
 
     let Some(SubCommand::List(ListArguments { modified, created, .. })) = arguments.command.as_mut() else {
