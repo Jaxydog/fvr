@@ -41,7 +41,7 @@ pub const SCHEMA: self::schema::Command<'static> = {
     const RESOLVE: Argument<'_> =
         Argument::new("resolve-symlinks", "Show the target file for symbolic links").short('r');
     const SORT: Argument<'_> = Argument::new("sort", "Determines the sorting order (comma separated)").value(
-        Value::new("ORDER").required().list().default("name").options(&[
+        Value::new("ORDER").required().list().default("directories,files,name").options(&[
             "name",
             "accessed",
             "created",

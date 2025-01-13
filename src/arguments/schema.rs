@@ -370,7 +370,7 @@ impl<'s> Value<'s> {
     /// # Panics
     ///
     /// Panics if this schema is not valid.
-    pub fn validate(Self { name, about, default, options, .. }: Self) {
+    pub fn validate(Self { name, about, default, options, list, .. }: Self) {
         self::validate_string(name, true);
         self::validate_string_is_uppercase(name);
 
@@ -397,7 +397,7 @@ impl<'s> Value<'s> {
 
             assert_eq!(options.len(), deduped.len(), "{name:?} should not contain duplicate options");
 
-            if let Some(default) = default {
+            if let Some(default) = default.filter(|_| !list) {
                 assert!(options.contains(&default), "{name:?}'s options should contain the set default");
             }
         }
