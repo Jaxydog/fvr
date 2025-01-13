@@ -53,9 +53,16 @@ thread_local! {
 pub struct UserSection;
 
 impl Section for UserSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let length = MAX_USER_LEN.with(|v| *v);
-        let Some(user) = entry.data.and_then(|u| USERS.with(|v| v.get_user_by_uid(u.uid()))) else {
+    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+        let parent = &parents[parents.len() - 1];
+        let length = std::fs::read_dir(parent.path)?
+            .map_while(|v| v.and_then(|v| v.metadata()).ok())
+            .map_while(|v| USERS.with(|u| u.get_user_by_uid(v.uid())))
+            .map(|v| v.name().len())
+            .max()
+            .unwrap_or_else(|| MAX_USER_LEN.with(|v| *v));
+
+        let Some(user) = entry.data.and_then(|v| USERS.with(|u| u.get_user_by_uid(v.uid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -64,9 +71,16 @@ impl Section for UserSection {
         writev!(f, [user.name().as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let length = MAX_USER_LEN.with(|v| *v);
-        let Some(user) = entry.data.and_then(|u| USERS.with(|v| v.get_user_by_uid(u.uid()))) else {
+    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+        let parent = &parents[parents.len() - 1];
+        let length = std::fs::read_dir(parent.path)?
+            .map_while(|v| v.and_then(|v| v.metadata()).ok())
+            .map_while(|v| USERS.with(|u| u.get_user_by_uid(v.uid())))
+            .map(|v| v.name().len())
+            .max()
+            .unwrap_or_else(|| MAX_USER_LEN.with(|v| *v));
+
+        let Some(user) = entry.data.and_then(|v| USERS.with(|u| u.get_user_by_uid(v.uid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack);
         };
 
@@ -81,9 +95,16 @@ impl Section for UserSection {
 pub struct GroupSection;
 
 impl Section for GroupSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let length = MAX_GROUP_LEN.with(|v| *v);
-        let Some(group) = entry.data.and_then(|u| USERS.with(|v| v.get_group_by_gid(u.gid()))) else {
+    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+        let parent = &parents[parents.len() - 1];
+        let length = std::fs::read_dir(parent.path)?
+            .map_while(|v| v.and_then(|v| v.metadata()).ok())
+            .map_while(|v| USERS.with(|u| u.get_group_by_gid(v.gid())))
+            .map(|v| v.name().len())
+            .max()
+            .unwrap_or_else(|| MAX_GROUP_LEN.with(|v| *v));
+
+        let Some(group) = entry.data.and_then(|v| USERS.with(|u| u.get_group_by_gid(v.gid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -92,9 +113,16 @@ impl Section for GroupSection {
         writev!(f, [group.name().as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let length = MAX_GROUP_LEN.with(|v| *v);
-        let Some(group) = entry.data.and_then(|u| USERS.with(|v| v.get_group_by_gid(u.gid()))) else {
+    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+        let parent = &parents[parents.len() - 1];
+        let length = std::fs::read_dir(parent.path)?
+            .map_while(|v| v.and_then(|v| v.metadata()).ok())
+            .map_while(|v| USERS.with(|u| u.get_group_by_gid(v.gid())))
+            .map(|v| v.name().len())
+            .max()
+            .unwrap_or_else(|| MAX_GROUP_LEN.with(|v| *v));
+
+        let Some(group) = entry.data.and_then(|v| USERS.with(|u| u.get_group_by_gid(v.gid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack);
         };
 
