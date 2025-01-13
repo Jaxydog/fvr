@@ -25,7 +25,7 @@ use crate::section::Section;
 use crate::section::mode::ModeSection;
 use crate::section::name::NameSection;
 use crate::section::size::SizeSection;
-use crate::section::time::{CreatedSection, ModifiedSection};
+use crate::section::time::{AccessedSection, CreatedSection, ModifiedSection};
 use crate::section::user::{GroupSection, UserSection};
 
 /// Runs the command.
@@ -35,8 +35,19 @@ use crate::section::user::{GroupSection, UserSection};
 /// This function will return an error if the command fails.
 pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::List(list_arguments)) = arguments.command.as_ref() else { unreachable!() };
-    let ListArguments { paths, show_hidden, resolve_symlinks, sorting, mode, size, created, modified, user, group } =
-        list_arguments;
+    let ListArguments {
+        paths,
+        show_hidden,
+        resolve_symlinks,
+        sorting,
+        mode,
+        size,
+        created,
+        accessed,
+        modified,
+        user,
+        group,
+    } = list_arguments;
 
     let filter = crate::files::filter::by(|v, _| *show_hidden || !is_hidden(v));
     let sort = sorting.clone().unwrap_or_default();
@@ -45,6 +56,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let mode_section = if mode.is_hide() { None } else { Some(ModeSection::new(mode.is_extended())) };
     let size_section = if size.is_hide() { None } else { Some(SizeSection::new(*size)) };
     let created_section = if created.is_hide() { None } else { Some(CreatedSection::new(*created)) };
+    let accessed_section = if accessed.is_hide() { None } else { Some(AccessedSection::new(*accessed)) };
     let modified_section = if modified.is_hide() { None } else { Some(ModifiedSection::new(*modified)) };
     let user_section = user.then_some(UserSection);
     let group_section = group.then_some(GroupSection);
@@ -79,6 +91,11 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
             }
             if let Some(created) = &created_section {
                 created.write(arguments.color, f, parents, &entry)?;
+
+                f.write_all(b" ")?;
+            }
+            if let Some(accessed) = &accessed_section {
+                accessed.write(arguments.color, f, parents, &entry)?;
 
                 f.write_all(b" ")?;
             }

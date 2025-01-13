@@ -38,11 +38,12 @@ pub const SCHEMA: self::schema::Command<'static> = {
     const COLOR: Argument<'_> = Argument::new("color", "Determines whether to output with color")
         .value(Value::new("CHOICE").required().default("auto").options(&["auto", "always", "never"]));
     const ALL: Argument<'_> = Argument::new("all", "Show all entries, including hidden entries").short('a');
-    const RESOLVE_SYMLINKS: Argument<'_> =
+    const RESOLVE: Argument<'_> =
         Argument::new("resolve-symlinks", "Show the target file for symbolic links").short('r');
     const SORT: Argument<'_> = Argument::new("sort", "Determines the sorting order (comma separated)").value(
         Value::new("ORDER").required().list().default("name").options(&[
             "name",
+            "accessed",
             "created",
             "modified",
             "size",
@@ -61,6 +62,8 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "base-2", "base-10"]));
     const CREATED: Argument<'_> = Argument::new("created", "Determines whether to display an entry's creation date")
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
+    const ACCESSED: Argument<'_> = Argument::new("accessed", "Determines whether to display an entry's access date")
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
     const MODIFIED: Argument<'_> =
         Argument::new("modified", "Determines whether to display an entry's modification date")
             .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
@@ -77,10 +80,10 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .sub_commands(&[
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT, MODE, SIZE, CREATED, MODIFIED, USER, GROUP]),
+                .arguments(&[HELP, COLOR, ALL, RESOLVE, SORT, MODE, SIZE, CREATED, ACCESSED, MODIFIED, USER, GROUP]),
             Command::new("tree", "List the contents of directories in a tree-based view")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, RESOLVE_SYMLINKS, SORT]),
+                .arguments(&[HELP, COLOR, ALL, RESOLVE, SORT]),
         ])
 };
 
@@ -162,6 +165,9 @@ where
         }
         Long("created") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, "created")
+        }
+        Long("accessed") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+            self::parse_time(arguments, parser, "accessed")
         }
         Long("modified") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, "modified")
@@ -287,6 +293,7 @@ where
     for string in orderings.split(',') {
         let mut next = match string.trim_start_matches("reverse-") {
             "name" => SortOrder::Name,
+            "accessed" => SortOrder::Accessed,
             "created" => SortOrder::Created,
             "modified" => SortOrder::Modified,
             "size" => SortOrder::Size,
@@ -380,12 +387,13 @@ where
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid time visibility '{v}'"))),
     };
 
-    let Some(SubCommand::List(ListArguments { modified, created, .. })) = arguments.command.as_mut() else {
+    let Some(SubCommand::List(ListArguments { created, accessed, modified, .. })) = arguments.command.as_mut() else {
         unreachable!();
     };
 
     match set {
         "created" => *created = choice,
+        "accessed" => *accessed = choice,
         "modified" => *modified = choice,
         _ => unreachable!(),
     }

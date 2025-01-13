@@ -153,6 +153,8 @@ pub struct ListArguments {
     pub size: SizeVisibility,
     /// The preferred creation date visibility.
     pub created: TimeVisibility,
+    /// The preferred access date visibility.
+    pub accessed: TimeVisibility,
     /// The preferred modification date visibility.
     pub modified: TimeVisibility,
     /// Whether to show owner users.
@@ -221,6 +223,8 @@ impl Paths {
 pub enum SortOrder {
     /// Alphabetically.
     Name,
+    /// Access date.
+    Accessed,
     /// Creation date.
     Created,
     /// Modification date.
@@ -275,8 +279,9 @@ impl SortOrder {
 
         by(move |lhs, rhs| match self {
             Self::Name => extract(|v, _| v.as_os_str().to_ascii_lowercase()).sort(lhs, rhs),
-            Self::Created => try_extract(|_, v| v.created()).sort(lhs, rhs),
-            Self::Modified => try_extract(|_, v| v.modified()).sort(lhs, rhs),
+            Self::Accessed => try_extract(|_, v| v.accessed()).reverse().sort(lhs, rhs),
+            Self::Created => try_extract(|_, v| v.created()).reverse().sort(lhs, rhs),
+            Self::Modified => try_extract(|_, v| v.modified()).reverse().sort(lhs, rhs),
             Self::Size => extract(|_, v| v.is_dir()).then(extract(|_, v| v.size()).reverse()).sort(lhs, rhs),
             Self::Hidden => extract(|v, _| crate::files::is_hidden(v)).reverse().sort(lhs, rhs),
             Self::Directories => extract(|_, v| v.is_dir()).reverse().sort(lhs, rhs),

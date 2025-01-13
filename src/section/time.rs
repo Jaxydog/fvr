@@ -97,6 +97,64 @@ impl Section for CreatedSection {
         }
         .expect("will only fail if the formats are invalid");
 
+        writev!(f, [formatted.as_bytes()] in BrightGreen)
+    }
+}
+
+/// A [`Section`] that writes an entry's creation date.
+#[derive(Clone, Copy, Debug)]
+pub struct AccessedSection {
+    /// Determines how the date is rendered.
+    pub visibility: TimeVisibility,
+}
+
+impl AccessedSection {
+    /// Creates a new [`AccessedSection`].
+    #[must_use]
+    pub const fn new(visibility: TimeVisibility) -> Self {
+        Self { visibility }
+    }
+}
+
+#[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
+impl Section for AccessedSection {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+        let Some(modified) = entry.data.and_then(|v| v.accessed().ok()) else {
+            return writev!(f, [
+                &[CHAR_MISSING],
+                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+            ]);
+        };
+
+        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
+        let formatted = match self.visibility {
+            TimeVisibility::Hide => unreachable!(),
+            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
+            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
+            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
+        }
+        .expect("will only fail if the formats are invalid");
+
+        writev!(f, [formatted.as_bytes()])
+    }
+
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+        let Some(modified) = entry.data.and_then(|v| v.accessed().ok()) else {
+            return writev!(f, [
+                &[CHAR_MISSING],
+                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+            ] in BrightBlack);
+        };
+
+        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
+        let formatted = match self.visibility {
+            TimeVisibility::Hide => unreachable!(),
+            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
+            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
+            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
+        }
+        .expect("will only fail if the formats are invalid");
+
         writev!(f, [formatted.as_bytes()] in BrightCyan)
     }
 }
