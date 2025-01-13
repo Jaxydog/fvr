@@ -25,7 +25,7 @@ use crate::section::Section;
 use crate::section::mode::ModeSection;
 use crate::section::name::NameSection;
 use crate::section::size::SizeSection;
-use crate::section::time::{AccessedSection, CreatedSection, ModifiedSection};
+use crate::section::time::TimeSection;
 use crate::section::user::{GroupSection, UserSection};
 
 /// Runs the command.
@@ -55,9 +55,9 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
     let mode_section = if mode.is_hide() { None } else { Some(ModeSection::new(mode.is_extended())) };
     let size_section = if size.is_hide() { None } else { Some(SizeSection::new(*size)) };
-    let created_section = if created.is_hide() { None } else { Some(CreatedSection::new(*created)) };
-    let accessed_section = if accessed.is_hide() { None } else { Some(AccessedSection::new(*accessed)) };
-    let modified_section = if modified.is_hide() { None } else { Some(ModifiedSection::new(*modified)) };
+    let created_section = if created.is_hide() { None } else { Some(TimeSection::created(*created)) };
+    let accessed_section = if accessed.is_hide() { None } else { Some(TimeSection::accessed(*accessed)) };
+    let modified_section = if modified.is_hide() { None } else { Some(TimeSection::modified(*modified)) };
     let user_section = user.then_some(UserSection);
     let group_section = group.then_some(GroupSection);
     let name_section = NameSection::new(true, *resolve_symlinks);

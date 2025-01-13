@@ -47,36 +47,71 @@ thread_local! {
     static OFFSET: UtcOffset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
 }
 
-/// A [`Section`] that writes an entry's creation date.
-#[derive(Clone, Copy, Debug)]
-pub struct CreatedSection {
-    /// Determines how the date is rendered.
-    pub visibility: TimeVisibility,
+/// Determines what type of time section is shown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimeSectionType {
+    /// Created timestamp.
+    Created,
+    /// Accessed timestamp.
+    Accessed,
+    /// Modified timestamp.
+    Modified,
 }
 
-impl CreatedSection {
-    /// Creates a new [`CreatedSection`].
+/// A [`Section`] that writes an entry's extracted date.
+#[derive(Clone, Copy, Debug)]
+pub struct TimeSection {
+    /// Determines how the date is rendered.
+    pub visibility: TimeVisibility,
+    /// The time section type.
+    pub kind: TimeSectionType,
+}
+
+impl TimeSection {
+    /// Creates a new [`TimeSection`].
     #[must_use]
-    pub const fn new(visibility: TimeVisibility) -> Self {
-        Self { visibility }
+    pub const fn new(visibility: TimeVisibility, kind: TimeSectionType) -> Self {
+        Self { visibility, kind }
+    }
+
+    /// Creates a new [`TimeSection`] for a creation date timestamp.
+    #[must_use]
+    pub const fn created(visibility: TimeVisibility) -> Self {
+        Self::new(visibility, TimeSectionType::Created)
+    }
+
+    /// Creates a new [`TimeSection`] for an access date timestamp.
+    #[must_use]
+    pub const fn accessed(visibility: TimeVisibility) -> Self {
+        Self::new(visibility, TimeSectionType::Accessed)
+    }
+
+    /// Creates a new [`TimeSection`] for a modification date timestamp.
+    #[must_use]
+    pub const fn modified(visibility: TimeVisibility) -> Self {
+        Self::new(visibility, TimeSectionType::Modified)
     }
 }
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
-impl Section for CreatedSection {
+impl Section for TimeSection {
     fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let Some(created) = entry.data.and_then(|v| v.created().ok()) else {
+        let Some(timestamp) = entry.data.and_then(|v| match self.kind {
+            TimeSectionType::Created => v.created().ok(),
+            TimeSectionType::Accessed => v.accessed().ok(),
+            TimeSectionType::Modified => v.modified().ok(),
+        }) else {
             return writev!(f, [
                 &[CHAR_MISSING],
                 if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ]);
         };
 
-        let created = OFFSET.with(|v| OffsetDateTime::from(created).to_offset(*v));
+        let timestamp = OFFSET.with(|v| OffsetDateTime::from(timestamp).to_offset(*v));
         let formatted = match self.visibility {
+            TimeVisibility::Simple => timestamp.format(SIMPLE_FORMAT),
+            TimeVisibility::Iso8601 => timestamp.format(&Iso8601::DEFAULT),
             TimeVisibility::Hide => unreachable!(),
-            TimeVisibility::Simple => created.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => created.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
 
@@ -84,133 +119,29 @@ impl Section for CreatedSection {
     }
 
     fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let Some(modified) = entry.data.and_then(|v| v.created().ok()) else {
+        let Some(timestamp) = entry.data.and_then(|v| match self.kind {
+            TimeSectionType::Created => v.created().ok(),
+            TimeSectionType::Accessed => v.accessed().ok(),
+            TimeSectionType::Modified => v.modified().ok(),
+        }) else {
             return writev!(f, [
                 &[CHAR_MISSING],
                 if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ] in BrightBlack);
         };
 
-        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
+        let timestamp = OFFSET.with(|v| OffsetDateTime::from(timestamp).to_offset(*v));
         let formatted = match self.visibility {
+            TimeVisibility::Simple => timestamp.format(SIMPLE_FORMAT),
+            TimeVisibility::Iso8601 => timestamp.format(&Iso8601::DEFAULT),
             TimeVisibility::Hide => unreachable!(),
-            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
 
-        writev!(f, [formatted.as_bytes()] in BrightGreen)
-    }
-}
-
-/// A [`Section`] that writes an entry's creation date.
-#[derive(Clone, Copy, Debug)]
-pub struct AccessedSection {
-    /// Determines how the date is rendered.
-    pub visibility: TimeVisibility,
-}
-
-impl AccessedSection {
-    /// Creates a new [`AccessedSection`].
-    #[must_use]
-    pub const fn new(visibility: TimeVisibility) -> Self {
-        Self { visibility }
-    }
-}
-
-#[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
-impl Section for AccessedSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let Some(modified) = entry.data.and_then(|v| v.accessed().ok()) else {
-            return writev!(f, [
-                &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
-            ]);
-        };
-
-        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
-        let formatted = match self.visibility {
-            TimeVisibility::Hide => unreachable!(),
-            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
+        match self.kind {
+            TimeSectionType::Created => writev!(f, [formatted.as_bytes()] in BrightGreen),
+            TimeSectionType::Accessed => writev!(f, [formatted.as_bytes()] in BrightCyan),
+            TimeSectionType::Modified => writev!(f, [formatted.as_bytes()] in BrightBlue),
         }
-        .expect("will only fail if the formats are invalid");
-
-        writev!(f, [formatted.as_bytes()])
-    }
-
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let Some(modified) = entry.data.and_then(|v| v.accessed().ok()) else {
-            return writev!(f, [
-                &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
-            ] in BrightBlack);
-        };
-
-        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
-        let formatted = match self.visibility {
-            TimeVisibility::Hide => unreachable!(),
-            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
-        }
-        .expect("will only fail if the formats are invalid");
-
-        writev!(f, [formatted.as_bytes()] in BrightCyan)
-    }
-}
-
-/// A [`Section`] that writes an entry's creation date.
-#[derive(Clone, Copy, Debug)]
-pub struct ModifiedSection {
-    /// Determines how the date is rendered.
-    pub visibility: TimeVisibility,
-}
-
-impl ModifiedSection {
-    /// Creates a new [`ModifiedSection`].
-    #[must_use]
-    pub const fn new(visibility: TimeVisibility) -> Self {
-        Self { visibility }
-    }
-}
-
-#[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
-impl Section for ModifiedSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let Some(modified) = entry.data.and_then(|v| v.modified().ok()) else {
-            return writev!(f, [
-                &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
-            ]);
-        };
-
-        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
-        let formatted = match self.visibility {
-            TimeVisibility::Hide => unreachable!(),
-            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
-        }
-        .expect("will only fail if the formats are invalid");
-
-        writev!(f, [formatted.as_bytes()])
-    }
-
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let Some(modified) = entry.data.and_then(|v| v.modified().ok()) else {
-            return writev!(f, [
-                &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
-            ] in BrightBlack);
-        };
-
-        let modified = OFFSET.with(|v| OffsetDateTime::from(modified).to_offset(*v));
-        let formatted = match self.visibility {
-            TimeVisibility::Hide => unreachable!(),
-            TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
-        }
-        .expect("will only fail if the formats are invalid");
-
-        writev!(f, [formatted.as_bytes()] in BrightBlue)
     }
 }
