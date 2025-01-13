@@ -25,6 +25,7 @@ use self::model::{
 };
 use self::parse::{Argument, Parser};
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
+use crate::section::time::TimeSectionType;
 
 pub mod model;
 pub mod parse;
@@ -164,13 +165,13 @@ where
             self::parse_size(arguments, parser)
         }
         Long("created") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_time(arguments, parser, "created")
+            self::parse_time(arguments, parser, TimeSectionType::Created)
         }
         Long("accessed") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_time(arguments, parser, "accessed")
+            self::parse_time(arguments, parser, TimeSectionType::Accessed)
         }
         Long("modified") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_time(arguments, parser, "modified")
+            self::parse_time(arguments, parser, TimeSectionType::Modified)
         }
         Short('u') | Long("user") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_user(arguments)
@@ -368,7 +369,11 @@ where
 }
 
 /// Parses the created and/or modified command-line argument.
-fn parse_time<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>, set: &str) -> Option<ParseResult>
+fn parse_time<'p, I>(
+    arguments: &mut Arguments,
+    parser: &mut Parser<&'p str, I>,
+    kind: TimeSectionType,
+) -> Option<ParseResult>
 where
     I: Iterator<Item = &'p str>,
 {
@@ -390,11 +395,10 @@ where
         unreachable!();
     };
 
-    match set {
-        "created" => *created = choice,
-        "accessed" => *accessed = choice,
-        "modified" => *modified = choice,
-        _ => unreachable!(),
+    match kind {
+        TimeSectionType::Created => *created = choice,
+        TimeSectionType::Accessed => *accessed = choice,
+        TimeSectionType::Modified => *modified = choice,
     }
 
     None
