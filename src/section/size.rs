@@ -16,8 +16,11 @@
 
 //! Implements a section that displays an entry's size.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::{Result, Write};
 use std::os::unix::fs::MetadataExt;
+use std::path::Path;
 use std::rc::Rc;
 
 use super::Section;
@@ -146,13 +149,42 @@ impl SizeSection {
     pub const fn new(visibility: SizeVisibility) -> Self {
         Self { visibility }
     }
+
+    /// Returns the maximum length that all simple size sections in the given directory will take up.
+    fn max_simple_len(parent: &Path) -> usize {
+        thread_local! {
+            static CACHE: RefCell<HashMap<Box<Path>, usize>> = RefCell::new(HashMap::new());
+        }
+
+        CACHE.with(|cache| {
+            if let Some(len) = cache.borrow().get(parent).copied() {
+                return len;
+            }
+
+            let len = std::fs::read_dir(parent).ok().and_then(|v| {
+                v.map_while(|v| v.and_then(|v| v.metadata()).ok())
+                    .map(|v| itoa::Buffer::new().format(v.size()).len())
+                    .max()
+            });
+            let len = len.unwrap_or(Self::WIDTH_SIMPLE);
+
+            cache.borrow_mut().insert(Box::from(parent), len);
+
+            len
+        })
+    }
 }
 
 impl Section for SizeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         if entry.is_dir() {
             return match self.visibility {
-                SizeVisibility::Simple => writev!(f, [&[Self::CHAR_BLANK], &[Self::CHAR_PADDING; 19]]),
+                SizeVisibility::Simple => {
+                    writev!(f, [&[Self::CHAR_BLANK], &vec![
+                        Self::CHAR_PADDING;
+                        Self::max_simple_len(parents[parents.len() - 1].path) - 1
+                    ]])
+                }
                 SizeVisibility::Base2 => writev!(f, [
                     &[Self::CHAR_PADDING; 3],
                     &[Self::CHAR_BLANK, Self::CHAR_DECIMAL, Self::CHAR_BLANK],
@@ -174,8 +206,9 @@ impl Section for SizeSection {
             let mut buffer = itoa::Buffer::new();
             let bytes = buffer.format(size).as_bytes();
 
-            let padding = [Self::CHAR_PADDING; Self::WIDTH_SIMPLE];
-            let padding = &padding[.. Self::WIDTH_SIMPLE - bytes.len()];
+            let length = Self::max_simple_len(parents[parents.len() - 1].path);
+            let padding = vec![Self::CHAR_PADDING; length];
+            let padding = &padding[.. length - bytes.len()];
 
             return writev!(f, [bytes, padding]);
         }
@@ -200,10 +233,15 @@ impl Section for SizeSection {
         writev!(f, [padding, whole, decimal, suffix])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         if entry.is_dir() {
             return match self.visibility {
-                SizeVisibility::Simple => writev!(f, [&[Self::CHAR_BLANK], &[Self::CHAR_PADDING; 19]] in BrightBlack),
+                SizeVisibility::Simple => {
+                    writev!(f, [&[Self::CHAR_BLANK], &vec![
+                        Self::CHAR_PADDING;
+                        Self::max_simple_len(parents[parents.len() - 1].path) - 1
+                    ]] in BrightBlack)
+                }
                 SizeVisibility::Base2 => writev!(f, [
                     &[Self::CHAR_PADDING; 3],
                     &[Self::CHAR_BLANK, Self::CHAR_DECIMAL, Self::CHAR_BLANK],
@@ -225,8 +263,9 @@ impl Section for SizeSection {
             let mut buffer = itoa::Buffer::new();
             let bytes = buffer.format(size).as_bytes();
 
-            let padding = [Self::CHAR_PADDING; Self::WIDTH_SIMPLE];
-            let padding = &padding[.. Self::WIDTH_SIMPLE - bytes.len()];
+            let length = Self::max_simple_len(parents[parents.len() - 1].path);
+            let padding = vec![Self::CHAR_PADDING; length];
+            let padding = &padding[.. length - bytes.len()];
 
             return match size {
                 v if v < Self::MEDIUM_THRESHOLD => writev!(f, [bytes, padding] in BrightGreen),
