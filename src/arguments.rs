@@ -61,12 +61,12 @@ pub const SCHEMA: self::schema::Command<'static> = {
         .short('s')
         .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "base-2", "base-10"]));
     const CREATED: Argument<'_> = Argument::new("created", "Determines whether to display an entry's creation date")
-        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]));
     const ACCESSED: Argument<'_> = Argument::new("accessed", "Determines whether to display an entry's access date")
-        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
+        .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]));
     const MODIFIED: Argument<'_> =
         Argument::new("modified", "Determines whether to display an entry's modification date")
-            .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "rfc3339", "iso8601"]));
+            .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]));
     const USER: Argument<'_> = Argument::new("user", "Show the username of each entry's owner").short('u');
     const GROUP: Argument<'_> = Argument::new("group", "Show the group name of each entry's owner").short('g');
 
@@ -382,7 +382,6 @@ where
     let choice = match choice {
         "hide" => TimeVisibility::Hide,
         "simple" => TimeVisibility::Simple,
-        "rfc3339" => TimeVisibility::Rfc3339,
         "iso8601" => TimeVisibility::Iso8601,
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid time visibility '{v}'"))),
     };

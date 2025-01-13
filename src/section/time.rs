@@ -20,7 +20,7 @@ use std::io::{Result, Write};
 use std::rc::Rc;
 
 use time::format_description::BorrowedFormatItem;
-use time::format_description::well_known::{Iso8601, Rfc3339};
+use time::format_description::well_known::Iso8601;
 use time::{OffsetDateTime, UtcOffset};
 
 use super::Section;
@@ -32,6 +32,10 @@ use crate::writev;
 pub const CHAR_MISSING: u8 = b'-';
 /// The byte used for padding.
 pub const CHAR_PADDING: u8 = b' ';
+/// The size of a simple timestamp.
+pub const SIZE_SIMPLE: usize = 15;
+/// The size of an ISO-8601 timestamp.
+pub const SIZE_ISO_8601: usize = 34;
 /// The format used to print simple dates.
 pub const SIMPLE_FORMAT: &[BorrowedFormatItem<'static>] = time::macros::format_description!(
     version = 2,
@@ -64,7 +68,7 @@ impl Section for CreatedSection {
         let Some(created) = entry.data.and_then(|v| v.created().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ]);
         };
 
@@ -72,7 +76,6 @@ impl Section for CreatedSection {
         let formatted = match self.visibility {
             TimeVisibility::Hide => unreachable!(),
             TimeVisibility::Simple => created.format(SIMPLE_FORMAT),
-            TimeVisibility::Rfc3339 => created.format(&Rfc3339),
             TimeVisibility::Iso8601 => created.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
@@ -84,7 +87,7 @@ impl Section for CreatedSection {
         let Some(modified) = entry.data.and_then(|v| v.created().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ] in BrightBlack);
         };
 
@@ -92,7 +95,6 @@ impl Section for CreatedSection {
         let formatted = match self.visibility {
             TimeVisibility::Hide => unreachable!(),
             TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
             TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
@@ -122,7 +124,7 @@ impl Section for AccessedSection {
         let Some(modified) = entry.data.and_then(|v| v.accessed().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ]);
         };
 
@@ -130,7 +132,6 @@ impl Section for AccessedSection {
         let formatted = match self.visibility {
             TimeVisibility::Hide => unreachable!(),
             TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
             TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
@@ -142,7 +143,7 @@ impl Section for AccessedSection {
         let Some(modified) = entry.data.and_then(|v| v.accessed().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ] in BrightBlack);
         };
 
@@ -150,7 +151,6 @@ impl Section for AccessedSection {
         let formatted = match self.visibility {
             TimeVisibility::Hide => unreachable!(),
             TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
             TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
@@ -180,7 +180,7 @@ impl Section for ModifiedSection {
         let Some(modified) = entry.data.and_then(|v| v.modified().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ]);
         };
 
@@ -188,7 +188,6 @@ impl Section for ModifiedSection {
         let formatted = match self.visibility {
             TimeVisibility::Hide => unreachable!(),
             TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
             TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");
@@ -200,7 +199,7 @@ impl Section for ModifiedSection {
         let Some(modified) = entry.data.and_then(|v| v.modified().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; 14] } else { &[CHAR_PADDING; 34] }
+                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
             ] in BrightBlack);
         };
 
@@ -208,7 +207,6 @@ impl Section for ModifiedSection {
         let formatted = match self.visibility {
             TimeVisibility::Hide => unreachable!(),
             TimeVisibility::Simple => modified.format(SIMPLE_FORMAT),
-            TimeVisibility::Rfc3339 => modified.format(&Rfc3339),
             TimeVisibility::Iso8601 => modified.format(&Iso8601::DEFAULT),
         }
         .expect("will only fail if the formats are invalid");

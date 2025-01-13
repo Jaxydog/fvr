@@ -393,8 +393,6 @@ pub enum TimeVisibility {
     Hide,
     /// Display in a simple format.
     Simple,
-    /// Display in RFC-3339 format.
-    Rfc3339,
     /// Display in ISO-8601 format.
     Iso8601,
 }
@@ -414,14 +412,6 @@ impl TimeVisibility {
     #[must_use]
     pub const fn is_simple(&self) -> bool {
         matches!(self, Self::Simple)
-    }
-
-    /// Returns `true` if the time visibility is [`Rfc3339`].
-    ///
-    /// [`Rfc3339`]: TimeVisibility::Rfc3339
-    #[must_use]
-    pub const fn is_rfc3339(&self) -> bool {
-        matches!(self, Self::Rfc3339)
     }
 
     /// Returns `true` if the time visibility is [`Iso8601`].
