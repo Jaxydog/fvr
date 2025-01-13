@@ -17,6 +17,7 @@
 //! Defines utilities for mapping out file tree structures.
 
 use std::cell::OnceCell;
+use std::ffi::OsStr;
 use std::fs::Metadata;
 use std::io::Result;
 use std::os::unix::ffi::OsStrExt;
@@ -41,6 +42,8 @@ pub struct Entry<'e> {
     pub index: usize,
     /// The total number of entries in the current depth.
     pub total: usize,
+    /// Caches the entry's file name.
+    file_name_cache: OnceCell<Option<Box<OsStr>>>,
     /// Caches whether this entry has children.
     has_children_cache: OnceCell<bool>,
 }
@@ -50,7 +53,7 @@ impl<'e> Entry<'e> {
     #[inline]
     #[must_use]
     pub const fn new(path: &'e Path, data: Option<&'e Metadata>, index: usize, total: usize) -> Self {
-        Self { path, data, index, total, has_children_cache: OnceCell::new() }
+        Self { path, data, index, total, file_name_cache: OnceCell::new(), has_children_cache: OnceCell::new() }
     }
 
     /// Creates a new [`Entry`] using the given path and optional data.
@@ -59,7 +62,7 @@ impl<'e> Entry<'e> {
     #[inline]
     #[must_use]
     pub const fn root(path: &'e Path, data: Option<&'e Metadata>) -> Self {
-        Self { path, data, index: 0, total: 1, has_children_cache: OnceCell::new() }
+        Self { path, data, index: 0, total: 1, file_name_cache: OnceCell::new(), has_children_cache: OnceCell::new() }
     }
 
     /// Returns whether this is the first entry in the current depth.
@@ -114,7 +117,13 @@ impl<'e> Entry<'e> {
     #[inline]
     #[must_use]
     pub fn is_hidden(&self) -> bool {
-        self::is_hidden(self.path)
+        self.file_name().and_then(|v| v.as_bytes().first()).copied().is_some_and(|v| v == b'.')
+    }
+
+    /// Returns the file name of this [`Entry`].
+    pub fn file_name(&self) -> Option<&OsStr> {
+        // This call can be expensive, so we cache the result.
+        self.file_name_cache.get_or_init(|| self.path.file_name().map(Box::from)).as_deref()
     }
 
     /// Returns `true` if this entry represents a directory and has one or more entries within it.

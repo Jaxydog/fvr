@@ -47,7 +47,7 @@ impl NameSection {
 
 impl Section for NameSection {
     fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let name = if self.trim_paths { entry.path.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
+        let name = if self.trim_paths { entry.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
 
         if entry.is_dir() {
             writev!(f, [name.as_encoded_bytes(), Self::DIR_SUFFIX])?;
@@ -61,7 +61,7 @@ impl Section for NameSection {
     }
 
     fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
-        let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or(entry.path.as_os_str());
+        let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or(entry.path.as_os_str());
         let name = name.as_encoded_bytes();
 
         if entry.is_symlink() {
