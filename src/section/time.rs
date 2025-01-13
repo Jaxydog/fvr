@@ -60,7 +60,7 @@ impl CreatedSection {
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for CreatedSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let Some(created) = entry.data.and_then(|v| v.created().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
@@ -80,7 +80,7 @@ impl Section for CreatedSection {
         writev!(f, [formatted.as_bytes()])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let Some(modified) = entry.data.and_then(|v| v.created().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
@@ -118,7 +118,7 @@ impl ModifiedSection {
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for ModifiedSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let Some(modified) = entry.data.and_then(|v| v.modified().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],
@@ -138,7 +138,7 @@ impl Section for ModifiedSection {
         writev!(f, [formatted.as_bytes()])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let Some(modified) = entry.data.and_then(|v| v.modified().ok()) else {
             return writev!(f, [
                 &[CHAR_MISSING],

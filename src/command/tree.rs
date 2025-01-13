@@ -55,7 +55,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
         f.write_all(b"\n")?;
 
-        crate::files::visit_entries_recursive(entry, &filter, &sort, &mut |parents, entry| {
+        crate::files::visit_entries_recursive(&entry, &filter, &sort, &mut |parents, entry| {
             TreeSection.write(arguments.color, f, parents, &entry)?;
 
             name_section.write(arguments.color, f, parents, &entry)?;

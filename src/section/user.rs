@@ -53,7 +53,7 @@ thread_local! {
 pub struct UserSection;
 
 impl Section for UserSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = MAX_USER_LEN.with(|v| *v);
         let Some(user) = entry.data.and_then(|u| USERS.with(|v| v.get_user_by_uid(u.uid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
@@ -64,7 +64,7 @@ impl Section for UserSection {
         writev!(f, [user.name().as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = MAX_USER_LEN.with(|v| *v);
         let Some(user) = entry.data.and_then(|u| USERS.with(|v| v.get_user_by_uid(u.uid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack);
@@ -81,7 +81,7 @@ impl Section for UserSection {
 pub struct GroupSection;
 
 impl Section for GroupSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = MAX_GROUP_LEN.with(|v| *v);
         let Some(group) = entry.data.and_then(|u| USERS.with(|v| v.get_group_by_gid(u.gid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
@@ -92,7 +92,7 @@ impl Section for GroupSection {
         writev!(f, [group.name().as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = MAX_GROUP_LEN.with(|v| *v);
         let Some(group) = entry.data.and_then(|u| USERS.with(|v| v.get_group_by_gid(u.gid()))) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack);

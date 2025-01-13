@@ -138,7 +138,7 @@ pub fn visit_entries<F, S, V>(entry: &Rc<Entry>, filter: &F, sort: &S, mut visit
 where
     F: Filter,
     S: Sort,
-    V: FnMut(&[Rc<Entry>], Rc<Entry>) -> Result<()>,
+    V: FnMut(&[&Rc<Entry>], Rc<Entry>) -> Result<()>,
 {
     let mut collection = std::fs::read_dir(entry.path)?
         .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path(), d))))
@@ -152,7 +152,7 @@ where
     collection.iter().enumerate().try_for_each(|(index, (path, data))| {
         let child = Entry::new(path, Some(data), index, total);
 
-        visit(&[Rc::clone(entry)], Rc::new(child))
+        visit(&[entry], Rc::new(child))
     })
 }
 
@@ -163,18 +163,18 @@ where
 /// # Errors
 ///
 /// This function will return an error if an entry's children could not be accessed or the closure fails.
-pub fn visit_entries_recursive<F, S, V>(entry: Rc<Entry>, filter: &F, sort: &S, visit: &mut V) -> Result<()>
+pub fn visit_entries_recursive<F, S, V>(entry: &Rc<Entry>, filter: &F, sort: &S, visit: &mut V) -> Result<()>
 where
     F: Filter,
     S: Sort,
-    V: FnMut(&[Rc<Entry>], Rc<Entry>) -> Result<()>,
+    V: FnMut(&[&Rc<Entry>], Rc<Entry>) -> Result<()>,
 {
     #[inline]
-    fn inner<F, S, V>(entries: &[Rc<Entry>], filter: &F, sort: &S, visit: &mut V) -> Result<()>
+    fn inner<F, S, V>(entries: &[&Rc<Entry>], filter: &F, sort: &S, visit: &mut V) -> Result<()>
     where
         F: Filter,
         S: Sort,
-        V: FnMut(&[Rc<Entry>], Rc<Entry>) -> Result<()>,
+        V: FnMut(&[&Rc<Entry>], Rc<Entry>) -> Result<()>,
     {
         let Some(entry) = entries.last() else { unreachable!() };
 
@@ -185,7 +185,7 @@ where
                 let mut new_entries = Vec::with_capacity(entries.len() + 1);
 
                 new_entries.extend_from_slice(entries);
-                new_entries.push(entry);
+                new_entries.push(&entry);
 
                 inner(&new_entries, filter, sort, visit)?;
             }

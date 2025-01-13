@@ -46,7 +46,7 @@ impl NameSection {
 }
 
 impl Section for NameSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let name = if self.trim_paths { entry.path.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
 
         if entry.is_dir() {
@@ -60,7 +60,7 @@ impl Section for NameSection {
         if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or(entry.path.as_os_str());
         let name = name.as_encoded_bytes();
 
@@ -96,7 +96,7 @@ impl SymlinkSection {
 }
 
 impl Section for SymlinkSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let resolved = std::fs::read_link(entry.path)?;
 
         if resolved.try_exists()? {
@@ -112,7 +112,7 @@ impl Section for SymlinkSection {
         NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &Rc::new(entry))
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let resolved = std::fs::read_link(entry.path)?;
 
         if resolved.try_exists()? {

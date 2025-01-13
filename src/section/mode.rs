@@ -191,14 +191,14 @@ impl ModeSection {
 }
 
 impl Section for ModeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
         let permissions = Self::get_permissions(mode);
 
         writev!(f, [&[b'[', Self::get_type(mode)], if self.extended { &permissions } else { &permissions[3 ..] }, b"]"])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         writev!(f, [b"["] in BrightBlack)?;
 
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();

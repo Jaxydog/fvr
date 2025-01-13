@@ -149,7 +149,7 @@ impl SizeSection {
 }
 
 impl Section for SizeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         if entry.is_dir() {
             return match self.visibility {
                 SizeVisibility::Simple => writev!(f, [&[Self::CHAR_BLANK], &[Self::CHAR_PADDING; 19]]),
@@ -200,7 +200,7 @@ impl Section for SizeSection {
         writev!(f, [padding, whole, decimal, suffix])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         if entry.is_dir() {
             return match self.visibility {
                 SizeVisibility::Simple => writev!(f, [&[Self::CHAR_BLANK], &[Self::CHAR_PADDING; 19]] in BrightBlack),
