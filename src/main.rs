@@ -29,9 +29,8 @@
 
 use std::process::ExitCode;
 
-use arguments::model::SubCommand;
-
 use self::arguments::ParseResult;
+use self::arguments::model::SubCommand;
 
 pub mod arguments;
 pub mod files;
@@ -60,9 +59,9 @@ fn main() -> ExitCode {
     };
 
     if let Err(error) = match &arguments.command {
-        None => unreachable!(),
         Some(SubCommand::List(_)) => self::command::list::invoke(&arguments),
         Some(SubCommand::Tree(_)) => self::command::tree::invoke(&arguments),
+        None => unreachable!("a sub-command should have been specified by now"),
     } {
         eprintln!("{error}");
 

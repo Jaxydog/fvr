@@ -60,20 +60,16 @@ pub struct Parser<A: ArgumentLike, I> {
 }
 
 impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
-    /// Creates a new [`Parser<A, I>`][0].
-    ///
-    /// [0]: crate::arguments::parse::Parser
+    /// Creates a new [`Parser<A, I>`].
     pub const fn new(iterator: I) -> Self {
         Self { iterator, state: ParserState::Start { arguments_closed: false } }
     }
 
-    /// Returns the next argument of this [`Parser<A, I>`][0].
+    /// Returns the next argument of this [`Parser<A, I>`].
     ///
     /// # Errors
     ///
     /// This function will return an error if an argument's assigned value is ignored.
-    ///
-    /// [0]: crate::arguments::parse::Parser
     pub fn next_argument(&mut self) -> Result<Option<Argument<A>>, Error<A>> {
         if !matches!(
             self.state,
@@ -87,13 +83,11 @@ impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
         self.next_positional().map(|v| v.map(Argument::Positional))
     }
 
-    /// Returns the next positional argument of this [`Parser<A, I>`][0].
+    /// Returns the next positional argument of this [`Parser<A, I>`].
     ///
     /// # Errors
     ///
     /// This function will return an error if a non-positional argument was skipped.
-    ///
-    /// [0]: crate::arguments::parse::Parser
     pub fn next_positional(&mut self) -> Result<Option<A>, Error<A>> {
         match self.state {
             ParserState::Start { arguments_closed } => Ok(self.iterator.next().or_else(|| {
@@ -111,16 +105,15 @@ impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
         }
     }
 
-    /// Returns the next non-positional argument of this [`Parser<A, I>`][0].
+    /// Returns the next non-positional argument of this [`Parser<A, I>`].
     ///
-    /// If you want to receive positional arguments in-between non-positional arguments, use [`next_argument`][1].
+    /// If you want to receive positional arguments in-between non-positional arguments, use [`next_argument`].
     ///
     /// # Errors
     ///
     /// This function will return an error if an argument's assigned value is ignored.
     ///
-    /// [0]: crate::arguments::parse::Parser
-    /// [1]: crate::arguments::parse::Parser::next_argument
+    /// [`next_argument`]: crate::arguments::parse::Parser::next_argument
     pub fn next_parameter(&mut self) -> Result<Option<Parameter<A>>, Error<A>> {
         match self.state {
             ParserState::Start { .. } | ParserState::Ready(_) => {
@@ -189,13 +182,11 @@ impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
         }
     }
 
-    /// Returns the next value of this [`Parser<A, I>`][0].
+    /// Returns the next value of this [`Parser<A, I>`].
     ///
     /// # Errors
     ///
     /// This function will return an error if this is called without first retrieving an associated argument.
-    ///
-    /// [0]: crate::arguments::parse::Parser
     pub fn next_value(&mut self) -> Result<Option<A>, Error<A>> {
         match self.state {
             ParserState::HasValue(_, value) | ParserState::HasCluster(_, value) => {
@@ -221,9 +212,7 @@ impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
     }
 }
 
-/// A non-positional argument returned by a [`Parser<A, I>`][0].
-///
-/// [0]: crate::arguments::parse::Parser
+/// A non-positional argument returned by a [`Parser<A, I>`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Parameter<A: ArgumentLike> {
     /// A short-form argument, such as `-h` or `-V`.
@@ -241,9 +230,7 @@ impl<A: ArgumentLike<Short: Display> + Display> Display for Parameter<A> {
     }
 }
 
-/// An argument returned by a [`Parser<A, I>`][0].
-///
-/// [0]: crate::arguments::parse::Parser
+/// An argument returned by a [`Parser<A, I>`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Argument<A: ArgumentLike> {
     /// A short-form argument, such as `-h` or `-V`.
@@ -274,9 +261,7 @@ impl<A: ArgumentLike<Short: Display> + Display> Display for Argument<A> {
     }
 }
 
-/// A value that can be parsed as an argument by a [`Parser<A, I>`][0]
-///
-/// [0]: crate::arguments::parse::Parser
+/// A value that can be parsed as an argument by a [`Parser<A, I>`].
 pub trait ArgumentLike: Copy + Debug + Eq {
     /// The type used to represent a short argument (i.e., `-h`).
     type Short: Copy + Debug + Eq;
@@ -294,9 +279,9 @@ pub trait ArgumentLike: Copy + Debug + Eq {
 
     /// Returns a short-form argument from this value, assuming that it is a cluster.
     ///
-    /// This should only be called on the value returned by [`as_short_cluster`][0].
+    /// This should only be called on the value returned by [`as_short_cluster`].
     ///
-    /// [0]: crate::arguments::parse::ArgumentLike::as_short_cluster
+    /// [`as_short_cluster`]: crate::arguments::parse::ArgumentLike::as_short_cluster
     fn as_short_argument(self) -> Option<(Self::Short, Option<Self>)>;
 }
 

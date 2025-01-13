@@ -207,9 +207,9 @@ where
 
 /// Returns a new path that represents the relative path from `root` to `path`.
 ///
-/// Implementation roughly taken from the [`pathdiff`][0] crate.
+/// Implementation roughly taken from the [`pathdiff`] crate.
 ///
-/// [0]: https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
+/// [`pathdiff`]: https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
 pub fn relativize<R, P>(root: R, path: P) -> Option<PathBuf>
 where
     R: AsRef<Path>,

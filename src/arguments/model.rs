@@ -397,7 +397,7 @@ pub enum TimeVisibility {
 impl TimeVisibility {
     /// Returns `true` if the time visibility is [`Hide`].
     ///
-    /// [`Hide`]: ModifiedVisibility::Hide
+    /// [`Hide`]: TimeVisibility::Hide
     #[must_use]
     pub const fn is_hide(&self) -> bool {
         matches!(self, Self::Hide)
@@ -405,7 +405,7 @@ impl TimeVisibility {
 
     /// Returns `true` if the time visibility is [`Simple`].
     ///
-    /// [`Simple`]: ModifiedVisibility::Simple
+    /// [`Simple`]: TimeVisibility::Simple
     #[must_use]
     pub const fn is_simple(&self) -> bool {
         matches!(self, Self::Simple)
@@ -413,7 +413,7 @@ impl TimeVisibility {
 
     /// Returns `true` if the time visibility is [`Rfc3339`].
     ///
-    /// [`Rfc3339`]: ModifiedVisibility::Rfc3339
+    /// [`Rfc3339`]: TimeVisibility::Rfc3339
     #[must_use]
     pub const fn is_rfc3339(&self) -> bool {
         matches!(self, Self::Rfc3339)

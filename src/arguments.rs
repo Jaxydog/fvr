@@ -19,9 +19,10 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use model::{ModeVisibility, SizeVisibility, SortOrder, TimeVisibility};
-
-use self::model::{Arguments, ColorChoice, ListArguments, SubCommand, TreeArguments};
+use self::model::{
+    Arguments, ColorChoice, ListArguments, ModeVisibility, SizeVisibility, SortOrder, SubCommand, TimeVisibility,
+    TreeArguments,
+};
 use self::parse::{Argument, Parser};
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 
@@ -91,9 +92,7 @@ pub enum ParseResult {
     Exit(u8),
 }
 
-/// Return an exiting [`ParseResult`][0] and print the given value.
-///
-/// [0]: crate::arguments::ParseResult
+/// Return an exiting [`ParseResult`] and print the given value.
 #[inline]
 fn exit_and_print(code: u8, display: impl Display) -> ParseResult {
     if code == SUCCESS {
