@@ -68,7 +68,11 @@ pub const SCHEMA: self::schema::Command<'static> = {
 
     Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"))
-        .arguments(&[HELP, Argument::new("version", "Shows the command's version").short('V'), COLOR])
+        .arguments(&[
+            HELP.value(Value::new("SUBCOMMAND")),
+            Argument::new("version", "Shows the command's version").short('V'),
+            COLOR,
+        ])
         .sub_commands(&[
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
