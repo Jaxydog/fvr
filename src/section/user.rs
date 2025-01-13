@@ -18,12 +18,11 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::io::{Result, Write};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::rc::Rc;
-
-use uzers::{AllGroups, AllUsers, Groups, Users, UsersSnapshot};
 
 use super::Section;
 use crate::files::Entry;
@@ -33,26 +32,29 @@ use crate::writev;
 pub const CHAR_MISSING: u8 = b'-';
 /// The byte used for padding.
 pub const CHAR_PADDING: u8 = b' ';
-
-thread_local! {
-    /// Caches the users and groups on this system.
-    #[expect(unsafe_code, reason = "unsafe is required to retrieve these values")]
-    // Safety: We only ever call potentially problematic code on this line, so there is not possible conflict.
-    static USERS: UsersSnapshot = unsafe { UsersSnapshot::new() };
-}
+/// The assumed maximum length of a username.
+pub const MAX_LEN: usize = 32;
 
 /// A [`Section`] that writes an entry's owner username.
 #[derive(Clone, Copy, Debug)]
 pub struct UserSection;
 
 impl UserSection {
+    /// Returns the user name associated with the given user identifier.
+    fn name(uid: u32) -> Option<Rc<OsStr>> {
+        thread_local! {
+            static CACHE: RefCell<HashMap<u32, Option<Rc<OsStr>>>> = RefCell::new(HashMap::new());
+        }
+
+        CACHE.with(|v| {
+            v.borrow_mut().entry(uid).or_insert_with(|| uzers::get_user_by_uid(uid).map(|v| v.name().into())).clone()
+        })
+    }
+
     /// Returns the maximum length that all user sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
             static CACHE: RefCell<HashMap<Box<Path>, usize>> = RefCell::new(HashMap::new());
-            static MAX_USER_LEN: usize = {
-                USERS.with(|v| v.get_all_users().map(|v| v.name().len()).max().unwrap_or_default())
-            };
         }
 
         CACHE.with(|cache| {
@@ -60,13 +62,14 @@ impl UserSection {
                 return len;
             }
 
-            let len = std::fs::read_dir(parent).ok().and_then(|v| {
-                v.map_while(|v| v.and_then(|v| v.metadata()).ok())
-                    .map_while(|v| USERS.with(|u| u.get_user_by_uid(v.uid())))
-                    .map(|v| v.name().len())
-                    .max()
-            });
-            let len = len.unwrap_or_else(|| MAX_USER_LEN.with(|v| *v));
+            let len = std::fs::read_dir(parent)
+                .ok()
+                .and_then(|v| {
+                    v.map_while(|v| v.and_then(|v| v.metadata()).ok())
+                        .map_while(|v| Self::name(v.uid()).map(|v| v.len()))
+                        .max()
+                })
+                .unwrap_or(MAX_LEN);
 
             cache.borrow_mut().insert(Box::from(parent), len);
 
@@ -79,25 +82,25 @@ impl Section for UserSection {
     fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
-        let Some(user) = entry.data.and_then(|v| USERS.with(|u| u.get_user_by_uid(v.uid()))) else {
+        let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
-        let padding = vec![CHAR_PADDING; length.saturating_sub(user.name().len())];
+        let padding = vec![CHAR_PADDING; length.saturating_sub(user.len())];
 
-        writev!(f, [user.name().as_encoded_bytes(), &padding])
+        writev!(f, [user.as_encoded_bytes(), &padding])
     }
 
     fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
-        let Some(user) = entry.data.and_then(|v| USERS.with(|u| u.get_user_by_uid(v.uid()))) else {
-            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack);
+        let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
+            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
-        let padding = vec![CHAR_PADDING; length.saturating_sub(user.name().len())];
+        let padding = vec![CHAR_PADDING; length.saturating_sub(user.len())];
 
-        writev!(f, [user.name().as_encoded_bytes(), &padding] in BrightGreen)
+        writev!(f, [user.as_encoded_bytes(), &padding] in BrightGreen)
     }
 }
 
@@ -106,13 +109,21 @@ impl Section for UserSection {
 pub struct GroupSection;
 
 impl GroupSection {
+    /// Returns the group name associated with the given group identifier.
+    fn name(gid: u32) -> Option<Rc<OsStr>> {
+        thread_local! {
+            static CACHE: RefCell<HashMap<u32, Option<Rc<OsStr>>>> = RefCell::new(HashMap::new());
+        }
+
+        CACHE.with(|v| {
+            v.borrow_mut().entry(gid).or_insert_with(|| uzers::get_group_by_gid(gid).map(|v| v.name().into())).clone()
+        })
+    }
+
     /// Returns the maximum length that all group sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
             static CACHE: RefCell<HashMap<Box<Path>, usize>> = RefCell::new(HashMap::new());
-            static MAX_GROUP_LEN: usize = {
-                USERS.with(|v| v.get_all_groups().map(|v| v.name().len()).max().unwrap_or_default())
-            };
         }
 
         CACHE.with(|cache| {
@@ -120,13 +131,14 @@ impl GroupSection {
                 return len;
             }
 
-            let len = std::fs::read_dir(parent).ok().and_then(|v| {
-                v.map_while(|v| v.and_then(|v| v.metadata()).ok())
-                    .map_while(|v| USERS.with(|u| u.get_group_by_gid(v.gid())))
-                    .map(|v| v.name().len())
-                    .max()
-            });
-            let len = len.unwrap_or_else(|| MAX_GROUP_LEN.with(|v| *v));
+            let len = std::fs::read_dir(parent)
+                .ok()
+                .and_then(|v| {
+                    v.map_while(|v| v.and_then(|v| v.metadata()).ok())
+                        .map_while(|v| Self::name(v.gid()).map(|v| v.len()))
+                        .max()
+                })
+                .unwrap_or(MAX_LEN);
 
             cache.borrow_mut().insert(Box::from(parent), len);
 
@@ -139,24 +151,24 @@ impl Section for GroupSection {
     fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
-        let Some(group) = entry.data.and_then(|v| USERS.with(|u| u.get_group_by_gid(v.gid()))) else {
+        let Some(group) = entry.data.and_then(|v| Self::name(v.gid())) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
-        let padding = vec![CHAR_PADDING; length.saturating_sub(group.name().len())];
+        let padding = vec![CHAR_PADDING; length.saturating_sub(group.len())];
 
-        writev!(f, [group.name().as_encoded_bytes(), &padding])
+        writev!(f, [group.as_encoded_bytes(), &padding])
     }
 
     fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
-        let Some(group) = entry.data.and_then(|v| USERS.with(|u| u.get_group_by_gid(v.gid()))) else {
-            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack);
+        let Some(group) = entry.data.and_then(|v| Self::name(v.gid())) else {
+            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
-        let padding = vec![CHAR_PADDING; length.saturating_sub(group.name().len())];
+        let padding = vec![CHAR_PADDING; length.saturating_sub(group.len())];
 
-        writev!(f, [group.name().as_encoded_bytes(), &padding] in BrightYellow)
+        writev!(f, [group.as_encoded_bytes(), &padding] in BrightYellow)
     }
 }
