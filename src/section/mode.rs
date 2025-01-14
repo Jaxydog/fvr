@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 use super::Section;
 use crate::files::Entry;
-use crate::writev;
+use crate::{color_bytes, writev};
 
 /// Defines constants related to file entry types.
 pub mod file_type {
@@ -216,20 +216,24 @@ impl Section for ModeSection {
         }
 
         let permissions = Self::get_permissions(mode);
+        let mut buffer = Vec::<u8>::with_capacity(permissions.len() * 6);
 
         for permission in if self.extended { &permissions } else { &permissions[3 ..] } {
-            match *permission {
-                v @ Self::PERM_EMPTY => writev!(f, [&[v]] in BrightBlack)?,
-                v @ Self::PERM_READ => writev!(f, [&[v]] in BrightYellow)?,
-                v @ Self::PERM_WRITE => writev!(f, [&[v]] in BrightRed)?,
-                v @ Self::PERM_EXECUTE => writev!(f, [&[v]] in BrightGreen)?,
-                v @ Self::PERM_SETGID => writev!(f, [&[v]] in BrightCyan)?,
-                v @ Self::PERM_SETUID => writev!(f, [&[v]] in BrightBlue)?,
-                v @ Self::PERM_STICKY => writev!(f, [&[v]] in BrightMagenta)?,
+            buffer.extend_from_slice(match *permission {
+                Self::PERM_EMPTY => color_bytes!(BrightBlack),
+                Self::PERM_READ => color_bytes!(BrightYellow),
+                Self::PERM_WRITE => color_bytes!(BrightRed),
+                Self::PERM_EXECUTE => color_bytes!(BrightGreen),
+                Self::PERM_SETGID => color_bytes!(BrightCyan),
+                Self::PERM_SETUID => color_bytes!(BrightBlue),
+                Self::PERM_STICKY => color_bytes!(BrightMagenta),
                 _ => unreachable!(),
-            }
+            });
+
+            buffer.push(*permission);
         }
 
+        writev!(f, [&buffer])?;
         writev!(f, [b"]"] in BrightBlack)
     }
 }
