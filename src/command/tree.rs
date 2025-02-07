@@ -32,11 +32,14 @@ use crate::section::tree::TreeSection;
 /// This function will return an error if the command fails.
 pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command.as_ref() else { unreachable!() };
-    let TreeArguments { paths, show_hidden, resolve_symlinks, sorting } = tree_arguments;
+    let TreeArguments { paths, show_hidden, resolve_symlinks, sorting, ignored } = tree_arguments;
 
-    let filter = crate::files::filter::by(|v, _| *show_hidden || !is_hidden(v));
     let sort = sorting.clone().unwrap_or_default();
     let sort = sort.compile();
+    let filter = crate::files::filter::by(|v, _| {
+        // Check for hidden files, then exclude any ignored files.
+        (*show_hidden || !is_hidden(v)) && !ignored.as_ref().is_some_and(|i| i.has(v))
+    });
 
     let name_section = NameSection::new(true, *resolve_symlinks);
 

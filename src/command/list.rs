@@ -47,11 +47,15 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         modified,
         user,
         group,
+        ignored,
     } = list_arguments;
 
-    let filter = crate::files::filter::by(|v, _| *show_hidden || !is_hidden(v));
     let sort = sorting.clone().unwrap_or_default();
     let sort = sort.compile();
+    let filter = crate::files::filter::by(|v, _| {
+        // Check for hidden files, then exclude any ignored files.
+        (*show_hidden || !is_hidden(v)) && !ignored.as_ref().is_some_and(|i| i.has(v))
+    });
 
     let mode_section = if mode.is_hide() { None } else { Some(ModeSection::new(mode.is_extended())) };
     let size_section = if size.is_hide() { None } else { Some(SizeSection::new(*size)) };

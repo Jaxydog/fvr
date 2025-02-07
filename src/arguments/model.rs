@@ -16,6 +16,7 @@
 
 //! Defines the command's argument data types.
 
+use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
@@ -161,6 +162,8 @@ pub struct ListArguments {
     pub user: bool,
     /// Whether to show owner groups.
     pub group: bool,
+    /// The paths to ignore.
+    pub ignored: Option<Paths>,
 }
 
 /// The program's command-line arguments for the tree sub-command.
@@ -174,6 +177,8 @@ pub struct TreeArguments {
     pub resolve_symlinks: bool,
     /// The preferred sorting function.
     pub sorting: Option<SortOrder>,
+    /// The paths to ignore.
+    pub ignored: Option<Paths>,
 }
 
 /// The paths to list.
@@ -181,14 +186,19 @@ pub struct TreeArguments {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Paths {
     /// The inner set of paths.
-    inner: Vec<Box<Path>>,
+    inner: HashSet<Box<Path>>,
 }
 
 impl Paths {
     /// Creates a new [`Paths`].
     #[must_use]
-    pub const fn new() -> Self {
-        Self { inner: Vec::new() }
+    pub fn new() -> Self {
+        Self { inner: HashSet::new() }
+    }
+
+    /// Returns `true` if this value contains the given path.
+    pub fn has(&self, path: impl AsRef<Path>) -> bool {
+        self.inner.contains(path.as_ref())
     }
 
     /// Adds the given path to the list.
@@ -196,7 +206,7 @@ impl Paths {
         let path = Box::from(path.as_ref());
 
         if !self.inner.contains(&path) {
-            self.inner.push(path);
+            self.inner.insert(path);
         }
     }
 
