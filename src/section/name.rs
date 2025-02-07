@@ -55,7 +55,7 @@ impl Section for NameSection {
             writev!(f, [name.as_encoded_bytes(), Self::EXE_SUFFIX])?;
         } else {
             writev!(f, [name.as_encoded_bytes()])?;
-        };
+        }
 
         if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
     }

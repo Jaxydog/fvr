@@ -66,7 +66,7 @@ fn main() -> ExitCode {
         eprintln!("{error}");
 
         return ExitCode::from(self::exit_codes::ERROR_GENERIC);
-    };
+    }
 
     ExitCode::from(self::exit_codes::SUCCESS)
 }
