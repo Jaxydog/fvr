@@ -28,6 +28,11 @@ license = "AGPL-3.0-or-later"
 readme = "README.md"
 repository = "https://github.com/Jaxydog/fvr"
 
+[profile.release]
+codegen-units = 1
+lto = "fat"
+strip = "symbols"
+
 [dependencies]
 itoa = "~1.0"
 owo-colors = "~4.1"
