@@ -203,11 +203,7 @@ impl Paths {
 
     /// Adds the given path to the list.
     pub fn add(&mut self, path: impl AsRef<Path>) {
-        let path = Box::from(path.as_ref());
-
-        if !self.inner.contains(&path) {
-            self.inner.insert(path);
-        }
+        self.inner.insert(Box::from(path.as_ref()));
     }
 
     /// Returns an iterator of the inner paths.
