@@ -22,6 +22,7 @@ use std::rc::Rc;
 
 use super::Section;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 use crate::{color_bytes, writev};
 
 /// Defines constants related to file entry types.
@@ -191,14 +192,22 @@ impl ModeSection {
 }
 
 impl Section for ModeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
         let permissions = Self::get_permissions(mode);
 
         writev!(f, [&[b'[', Self::get_type(mode)], if self.extended { &permissions } else { &permissions[3 ..] }, b"]"])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         writev!(f, [b"["] in BrightBlack)?;
 
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();

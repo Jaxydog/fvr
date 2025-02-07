@@ -26,6 +26,7 @@ use time::{OffsetDateTime, UtcOffset};
 use super::Section;
 use crate::arguments::model::TimeVisibility;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 use crate::writev;
 
 /// The byte used when the creation date cannot be determined.
@@ -95,7 +96,11 @@ impl TimeSection {
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for TimeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let Some(timestamp) = entry.data.and_then(|v| match self.kind {
             TimeSectionType::Created => v.created().ok(),
             TimeSectionType::Accessed => v.accessed().ok(),
@@ -118,7 +123,11 @@ impl Section for TimeSection {
         writev!(f, [formatted.as_bytes()])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, _: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let Some(timestamp) = entry.data.and_then(|v| match self.kind {
             TimeSectionType::Created => v.created().ok(),
             TimeSectionType::Accessed => v.accessed().ok(),

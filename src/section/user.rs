@@ -26,6 +26,7 @@ use std::rc::Rc;
 
 use super::Section;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 use crate::writev;
 
 /// The byte used when the user is missing.
@@ -79,7 +80,12 @@ impl UserSection {
 }
 
 impl Section for UserSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write, F: Filter>(
+        &self,
+        f: &mut W,
+        parents: &[&Rc<Entry<F>>],
+        entry: &Rc<Entry<F>>,
+    ) -> Result<()> {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
         let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
@@ -91,7 +97,12 @@ impl Section for UserSection {
         writev!(f, [user.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write, F: Filter>(
+        &self,
+        f: &mut W,
+        parents: &[&Rc<Entry<F>>],
+        entry: &Rc<Entry<F>>,
+    ) -> Result<()> {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
         let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
@@ -148,7 +159,11 @@ impl GroupSection {
 }
 
 impl Section for GroupSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
         let Some(group) = entry.data.and_then(|v| Self::name(v.gid())) else {
@@ -160,7 +175,11 @@ impl Section for GroupSection {
         writev!(f, [group.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
         let Some(group) = entry.data.and_then(|v| Self::name(v.gid())) else {

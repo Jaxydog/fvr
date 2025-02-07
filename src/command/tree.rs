@@ -47,7 +47,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
     for (index, path) in tree_arguments.paths.get().enumerate() {
         let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::root(path, data.as_ref()));
+        let entry = Rc::new(Entry::root(path, data.as_ref(), &filter));
 
         if index > 0 {
             f.write_all(b"\n")?;

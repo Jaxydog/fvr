@@ -21,6 +21,7 @@ use std::rc::Rc;
 
 use super::Section;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 use crate::writev;
 
 /// A [`Section`] that writes an entry's name.
@@ -46,7 +47,12 @@ impl NameSection {
 }
 
 impl Section for NameSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W: Write, F: Filter>(
+        &self,
+        f: &mut W,
+        parents: &[&Rc<Entry<F>>],
+        entry: &Rc<Entry<F>>,
+    ) -> Result<()> {
         let name = if self.trim_paths { entry.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
 
         if entry.is_dir() {
@@ -60,7 +66,12 @@ impl Section for NameSection {
         if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W: Write, F: Filter>(
+        &self,
+        f: &mut W,
+        parents: &[&Rc<Entry<F>>],
+        entry: &Rc<Entry<F>>,
+    ) -> Result<()> {
         let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or(entry.path.as_os_str());
         let name = name.as_encoded_bytes();
 
@@ -96,7 +107,11 @@ impl SymlinkSection {
 }
 
 impl Section for SymlinkSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let resolved = std::fs::read_link(entry.path)?;
 
         if resolved.try_exists()? {
@@ -107,12 +122,16 @@ impl Section for SymlinkSection {
 
         let data = std::fs::symlink_metadata(&resolved).ok();
         let path = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
-        let entry = Entry::root(path.as_ref(), data.as_ref());
+        let entry = Entry::root(path.as_ref(), data.as_ref(), entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &Rc::new(entry))
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let resolved = std::fs::read_link(entry.path)?;
 
         if resolved.try_exists()? {
@@ -123,7 +142,7 @@ impl Section for SymlinkSection {
 
         let data = std::fs::symlink_metadata(&resolved).ok();
         let path = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
-        let entry = Entry::root(path.as_ref(), data.as_ref());
+        let entry = Entry::root(path.as_ref(), data.as_ref(), entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &Rc::new(entry))
     }

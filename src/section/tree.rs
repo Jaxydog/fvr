@@ -21,6 +21,7 @@ use std::rc::Rc;
 
 use super::Section;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 use crate::writev;
 
 /// A [`Section`] that writes branches for tree-based views.
@@ -45,7 +46,11 @@ impl TreeSection {
 }
 
 impl Section for TreeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let depth = parents.len();
 
         if entry.is_first() && depth == 0 {
@@ -70,7 +75,11 @@ impl Section for TreeSection {
         writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         let depth = parents.len();
 
         if entry.is_first() && depth == 0 {

@@ -33,7 +33,7 @@ pub mod sort;
 
 /// An entry returned by a visit call.
 #[derive(Clone, Debug)]
-pub struct Entry<'e> {
+pub struct Entry<'e, F: Filter> {
     /// The entry's file path.
     pub path: &'e Path,
     /// The entry's metadata.
@@ -42,18 +42,20 @@ pub struct Entry<'e> {
     pub index: usize,
     /// The total number of entries in the current depth.
     pub total: usize,
+    /// The filter used to resolve entries.
+    pub filter: &'e F,
     /// Caches the entry's file name.
     file_name_cache: OnceCell<Option<Box<OsStr>>>,
     /// Caches whether this entry has children.
     has_children_cache: OnceCell<bool>,
 }
 
-impl<'e> Entry<'e> {
+impl<'e, F: Filter> Entry<'e, F> {
     /// Creates a new [`Entry`] using the given path and optional data.
     #[inline]
     #[must_use]
-    pub const fn new(path: &'e Path, data: Option<&'e Metadata>, index: usize, total: usize) -> Self {
-        Self { path, data, index, total, file_name_cache: OnceCell::new(), has_children_cache: OnceCell::new() }
+    pub const fn new(path: &'e Path, data: Option<&'e Metadata>, index: usize, total: usize, filter: &'e F) -> Self {
+        Self { path, data, index, total, filter, file_name_cache: OnceCell::new(), has_children_cache: OnceCell::new() }
     }
 
     /// Creates a new [`Entry`] using the given path and optional data.
@@ -61,8 +63,8 @@ impl<'e> Entry<'e> {
     /// This entry will have an index of 0, a total count of 1.
     #[inline]
     #[must_use]
-    pub const fn root(path: &'e Path, data: Option<&'e Metadata>) -> Self {
-        Self { path, data, index: 0, total: 1, file_name_cache: OnceCell::new(), has_children_cache: OnceCell::new() }
+    pub const fn root(path: &'e Path, data: Option<&'e Metadata>, filter: &'e F) -> Self {
+        Self::new(path, data, 0, 1, filter)
     }
 
     /// Returns whether this is the first entry in the current depth.
@@ -130,8 +132,12 @@ impl<'e> Entry<'e> {
     #[must_use]
     pub fn has_children(&self) -> bool {
         *self.has_children_cache.get_or_init(|| {
-            // This call can be expensive, so we cache the result.
-            self.is_dir() && std::fs::read_dir(self.path).is_ok_and(|mut v| v.next().is_some())
+            // This call can be very expensive and slow, so we cache the result.
+            self.is_dir()
+                && std::fs::read_dir(self.path).is_ok_and(|mut v| {
+                    // Search for at least one child that matches the filter.
+                    v.any(|v| v.as_ref().is_ok_and(|v| v.metadata().is_ok_and(|m| self.filter.filter(&v.path(), &m))))
+                })
         })
     }
 }
@@ -143,11 +149,11 @@ impl<'e> Entry<'e> {
 /// # Errors
 ///
 /// This function will return an error if the entry's children could not be accessed or the closure fails.
-pub fn visit_entries<F, S, V>(entry: &Rc<Entry>, filter: &F, sort: &S, mut visit: V) -> Result<()>
+pub fn visit_entries<F, S, V>(entry: &Rc<Entry<F>>, filter: &F, sort: &S, mut visit: V) -> Result<()>
 where
     F: Filter,
     S: Sort,
-    V: FnMut(&[&Rc<Entry>], Rc<Entry>) -> Result<()>,
+    V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
 {
     let mut collection = std::fs::read_dir(entry.path)?
         .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path(), d))))
@@ -159,7 +165,7 @@ where
     let total = collection.len();
 
     collection.iter().enumerate().try_for_each(|(index, (path, data))| {
-        let child = Entry::new(path, Some(data), index, total);
+        let child = Entry::new(path, Some(data), index, total, filter);
 
         visit(&[entry], Rc::new(child))
     })
@@ -172,18 +178,18 @@ where
 /// # Errors
 ///
 /// This function will return an error if an entry's children could not be accessed or the closure fails.
-pub fn visit_entries_recursive<F, S, V>(entry: &Rc<Entry>, filter: &F, sort: &S, visit: &mut V) -> Result<()>
+pub fn visit_entries_recursive<F, S, V>(entry: &Rc<Entry<F>>, filter: &F, sort: &S, visit: &mut V) -> Result<()>
 where
     F: Filter,
     S: Sort,
-    V: FnMut(&[&Rc<Entry>], Rc<Entry>) -> Result<()>,
+    V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
 {
     #[inline]
-    fn inner<F, S, V>(entries: &[&Rc<Entry>], filter: &F, sort: &S, visit: &mut V) -> Result<()>
+    fn inner<F, S, V>(entries: &[&Rc<Entry<F>>], filter: &F, sort: &S, visit: &mut V) -> Result<()>
     where
         F: Filter,
         S: Sort,
-        V: FnMut(&[&Rc<Entry>], Rc<Entry>) -> Result<()>,
+        V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
     {
         let Some(entry) = entries.last() else { unreachable!() };
 

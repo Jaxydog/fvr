@@ -26,6 +26,7 @@ use std::rc::Rc;
 use super::Section;
 use crate::arguments::model::SizeVisibility;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 use crate::writev;
 
 /// Defines human-readable units.
@@ -176,7 +177,11 @@ impl SizeSection {
 }
 
 impl Section for SizeSection {
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         if entry.is_dir() {
             return match self.visibility {
                 SizeVisibility::Simple => {
@@ -233,7 +238,11 @@ impl Section for SizeSection {
         writev!(f, [padding, whole, decimal, suffix])
     }
 
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         if entry.is_dir() {
             return match self.visibility {
                 SizeVisibility::Simple => {

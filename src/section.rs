@@ -21,6 +21,7 @@ use std::rc::Rc;
 
 use crate::arguments::model::ColorChoice;
 use crate::files::Entry;
+use crate::files::filter::Filter;
 
 pub mod mode;
 pub mod name;
@@ -37,21 +38,31 @@ pub trait Section {
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write_plain<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()>;
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter;
 
     /// Writes this section into the given writer using color.
     ///
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write_color<W: Write>(&self, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()>;
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter;
 
     /// Writes this section into the given writer, determining whether to use color based on the given [`ColorChoice`].
     ///
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write<W: Write>(&self, color: ColorChoice, f: &mut W, parents: &[&Rc<Entry>], entry: &Rc<Entry>) -> Result<()> {
+    fn write<W, F>(&self, color: ColorChoice, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter,
+    {
         use supports_color::{Stream, on_cached};
 
         if color.is_always() || (color.is_auto() && { on_cached(Stream::Stdout).is_some_and(|v| v.has_basic) }) {

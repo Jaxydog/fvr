@@ -77,7 +77,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
     for (index, path) in list_arguments.paths.get().enumerate() {
         let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::new(path, data.as_ref(), index, list_arguments.paths.len()));
+        let entry = Rc::new(Entry::new(path, data.as_ref(), index, list_arguments.paths.len(), &filter));
 
         if list_arguments.paths.len() > 1 {
             if index > 0 {
