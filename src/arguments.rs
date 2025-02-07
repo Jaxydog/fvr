@@ -370,7 +370,7 @@ where
 
     *size = match choice {
         "hide" => SizeVisibility::Hide,
-        "basic" => SizeVisibility::Simple,
+        "simple" => SizeVisibility::Simple,
         "base-2" => SizeVisibility::Base2,
         "base-10" => SizeVisibility::Base10,
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid size visibility '{v}'"))),
