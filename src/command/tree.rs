@@ -19,7 +19,7 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use crate::arguments::model::{Arguments, SubCommand, TreeArguments};
+use crate::arguments::model::{Arguments, SubCommand};
 use crate::files::{Entry, is_hidden};
 use crate::section::Section;
 use crate::section::name::NameSection;
@@ -32,20 +32,19 @@ use crate::section::tree::TreeSection;
 /// This function will return an error if the command fails.
 pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command.as_ref() else { unreachable!() };
-    let TreeArguments { paths, show_hidden, resolve_symlinks, sorting, ignored } = tree_arguments;
 
-    let sort = sorting.clone().unwrap_or_default();
+    let sort = tree_arguments.sorting.clone().unwrap_or_default();
     let sort = sort.compile();
     let filter = crate::files::filter::by(|v, _| {
         // Check for hidden files, then exclude any ignored files.
-        (*show_hidden || !is_hidden(v)) && !ignored.as_ref().is_some_and(|i| i.has(v))
+        (tree_arguments.show_hidden || !is_hidden(v)) && !tree_arguments.ignored.as_ref().is_some_and(|i| i.has(v))
     });
 
-    let name_section = NameSection::new(true, *resolve_symlinks);
+    let name_section = NameSection::new(true, tree_arguments.resolve_symlinks);
 
     let f = &mut std::io::stdout().lock();
 
-    for (index, path) in paths.get().enumerate() {
+    for (index, path) in tree_arguments.paths.get().enumerate() {
         let data = std::fs::symlink_metadata(path).ok();
         let entry = Rc::new(Entry::root(path, data.as_ref()));
 

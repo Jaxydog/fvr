@@ -19,7 +19,7 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use crate::arguments::model::{Arguments, ListArguments, SubCommand};
+use crate::arguments::model::{Arguments, SubCommand};
 use crate::files::{Entry, is_hidden};
 use crate::section::Section;
 use crate::section::mode::ModeSection;
@@ -35,44 +35,50 @@ use crate::section::user::{GroupSection, UserSection};
 /// This function will return an error if the command fails.
 pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::List(list_arguments)) = arguments.command.as_ref() else { unreachable!() };
-    let ListArguments {
-        paths,
-        show_hidden,
-        resolve_symlinks,
-        sorting,
-        mode,
-        size,
-        created,
-        accessed,
-        modified,
-        user,
-        group,
-        ignored,
-    } = list_arguments;
 
-    let sort = sorting.clone().unwrap_or_default();
+    let sort = list_arguments.sorting.clone().unwrap_or_default();
     let sort = sort.compile();
     let filter = crate::files::filter::by(|v, _| {
         // Check for hidden files, then exclude any ignored files.
-        (*show_hidden || !is_hidden(v)) && !ignored.as_ref().is_some_and(|i| i.has(v))
+        (list_arguments.show_hidden || !is_hidden(v)) && !list_arguments.ignored.as_ref().is_some_and(|i| i.has(v))
     });
 
-    let mode_section = if mode.is_hide() { None } else { Some(ModeSection::new(mode.is_extended())) };
-    let size_section = if size.is_hide() { None } else { Some(SizeSection::new(*size)) };
-    let created_section = if created.is_hide() { None } else { Some(TimeSection::created(*created)) };
-    let accessed_section = if accessed.is_hide() { None } else { Some(TimeSection::accessed(*accessed)) };
-    let modified_section = if modified.is_hide() { None } else { Some(TimeSection::modified(*modified)) };
-    let user_section = user.then_some(UserSection);
-    let group_section = group.then_some(GroupSection);
-    let name_section = NameSection::new(true, *resolve_symlinks);
+    let mode_section = if list_arguments.mode.is_hide() {
+        None //
+    } else {
+        Some(ModeSection::new(list_arguments.mode.is_extended()))
+    };
+    let size_section = if list_arguments.size.is_hide() {
+        None // 
+    } else {
+        Some(SizeSection::new(list_arguments.size))
+    };
+    let created_section = if list_arguments.created.is_hide() {
+        None //
+    } else {
+        Some(TimeSection::created(list_arguments.created))
+    };
+    let accessed_section = if list_arguments.accessed.is_hide() {
+        None //
+    } else {
+        Some(TimeSection::accessed(list_arguments.accessed))
+    };
+    let modified_section = if list_arguments.modified.is_hide() {
+        None //
+    } else {
+        Some(TimeSection::modified(list_arguments.modified))
+    };
+    let user_section = list_arguments.user.then_some(UserSection);
+    let group_section = list_arguments.group.then_some(GroupSection);
+    let name_section = NameSection::new(true, list_arguments.resolve_symlinks);
 
     let f = &mut std::io::stdout().lock();
 
-    for (index, path) in paths.get().enumerate() {
+    for (index, path) in list_arguments.paths.get().enumerate() {
         let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::new(path, data.as_ref(), index, paths.len()));
+        let entry = Rc::new(Entry::new(path, data.as_ref(), index, list_arguments.paths.len()));
 
-        if paths.len() > 1 {
+        if list_arguments.paths.len() > 1 {
             if index > 0 {
                 f.write_all(b"\n")?;
             }
