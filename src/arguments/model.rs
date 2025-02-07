@@ -164,6 +164,8 @@ pub struct ListArguments {
     pub group: bool,
     /// The paths to exclude.
     pub excluded: Option<Paths>,
+    /// The paths to include.
+    pub included: Option<Paths>,
 }
 
 /// The program's command-line arguments for the tree sub-command.
@@ -179,6 +181,8 @@ pub struct TreeArguments {
     pub sorting: Option<SortOrder>,
     /// The paths to exclude.
     pub excluded: Option<Paths>,
+    /// The paths to include.
+    pub included: Option<Paths>,
 }
 
 /// The paths to list.

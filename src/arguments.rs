@@ -70,8 +70,11 @@ pub const SCHEMA: self::schema::Command<'static> = {
             .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]));
     const USER: Argument<'_> = Argument::new("user", "Show the username of each entry's owner").short('u');
     const GROUP: Argument<'_> = Argument::new("group", "Show the group name of each entry's owner").short('g');
-    const IGNORE: Argument<'_> = Argument::new("exclude", "Exclude the given directory from the listing")
+    const EXCLUDE: Argument<'_> = Argument::new("exclude", "Exclude the given directory from the listing")
         .short('e')
+        .value(Value::new("PATH").required());
+    const INCLUDE: Argument<'_> = Argument::new("include", "Include the given directory in the listing")
+        .short('i')
         .value(Value::new("PATH").required());
 
     Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
@@ -85,11 +88,12 @@ pub const SCHEMA: self::schema::Command<'static> = {
             Command::new("list", "List the contents of directories")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
                 .arguments(&[
-                    HELP, COLOR, ALL, RESOLVE, SORT, MODE, SIZE, CREATED, ACCESSED, MODIFIED, USER, GROUP, IGNORE,
+                    HELP, COLOR, ALL, RESOLVE, SORT, MODE, SIZE, CREATED, ACCESSED, MODIFIED, USER, GROUP, EXCLUDE,
+                    INCLUDE,
                 ]),
             Command::new("tree", "List the contents of directories in a tree-based view")
                 .positionals(&[Value::new("PATHS").about("The file paths to list").list().default(".")])
-                .arguments(&[HELP, COLOR, ALL, RESOLVE, SORT, IGNORE]),
+                .arguments(&[HELP, COLOR, ALL, RESOLVE, SORT, EXCLUDE, INCLUDE]),
         ])
 };
 
@@ -185,6 +189,7 @@ where
             self::parse_group(arguments)
         }
         Short('e') | Long("exclude") if arguments.command.is_some() => self::parse_exclude(arguments, parser),
+        Short('i') | Long("include") if arguments.command.is_some() => self::parse_include(arguments, parser),
         Positional(value) => self::parse_positional(arguments, value),
         _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
     }
@@ -454,6 +459,31 @@ where
         None => unreachable!(),
         Some(SubCommand::List(arguments)) => arguments.excluded.get_or_insert_default().add(path),
         Some(SubCommand::Tree(arguments)) => arguments.excluded.get_or_insert_default().add(path),
+    }
+
+    None
+}
+
+/// Parses the include command-line argument.
+fn parse_include<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
+where
+    I: Iterator<Item = &'p str>,
+{
+    let Some(path) = (match parser.next_value() {
+        Ok(choice) => choice,
+        Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
+    }) else {
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing included path"));
+    };
+    let path = match std::fs::canonicalize(path) {
+        Ok(path) => path,
+        Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
+    };
+
+    match arguments.command.as_mut() {
+        None => unreachable!(),
+        Some(SubCommand::List(arguments)) => arguments.included.get_or_insert_default().add(path),
+        Some(SubCommand::Tree(arguments)) => arguments.included.get_or_insert_default().add(path),
     }
 
     None

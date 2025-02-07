@@ -36,8 +36,9 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sort = tree_arguments.sorting.clone().unwrap_or_default();
     let sort = sort.compile();
     let filter = crate::files::filter::by(|v, _| {
-        // Check for hidden files, then exclude any excluded files.
-        (tree_arguments.show_hidden || !is_hidden(v)) && !tree_arguments.excluded.as_ref().is_some_and(|i| i.has(v))
+        (tree_arguments.show_hidden || !is_hidden(v))
+            && tree_arguments.included.as_ref().is_none_or(|i| i.has(v))
+            && !tree_arguments.excluded.as_ref().is_some_and(|e| e.has(v))
     });
 
     let name_section = NameSection::new(true, tree_arguments.resolve_symlinks);

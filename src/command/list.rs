@@ -39,8 +39,9 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let sort = list_arguments.sorting.clone().unwrap_or_default();
     let sort = sort.compile();
     let filter = crate::files::filter::by(|v, _| {
-        // Check for hidden files, then exclude any excluded files.
-        (list_arguments.show_hidden || !is_hidden(v)) && !list_arguments.excluded.as_ref().is_some_and(|i| i.has(v))
+        (list_arguments.show_hidden || !is_hidden(v))
+            && list_arguments.included.as_ref().is_none_or(|i| i.has(v))
+            && !list_arguments.excluded.as_ref().is_some_and(|e| e.has(v))
     });
 
     let mode_section = if list_arguments.mode.is_hide() {
