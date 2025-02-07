@@ -162,8 +162,8 @@ pub struct ListArguments {
     pub user: bool,
     /// Whether to show owner groups.
     pub group: bool,
-    /// The paths to ignore.
-    pub ignored: Option<Paths>,
+    /// The paths to exclude.
+    pub excluded: Option<Paths>,
 }
 
 /// The program's command-line arguments for the tree sub-command.
@@ -177,8 +177,8 @@ pub struct TreeArguments {
     pub resolve_symlinks: bool,
     /// The preferred sorting function.
     pub sorting: Option<SortOrder>,
-    /// The paths to ignore.
-    pub ignored: Option<Paths>,
+    /// The paths to exclude.
+    pub excluded: Option<Paths>,
 }
 
 /// The paths to list.

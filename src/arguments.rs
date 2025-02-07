@@ -70,8 +70,9 @@ pub const SCHEMA: self::schema::Command<'static> = {
             .value(Value::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]));
     const USER: Argument<'_> = Argument::new("user", "Show the username of each entry's owner").short('u');
     const GROUP: Argument<'_> = Argument::new("group", "Show the group name of each entry's owner").short('g');
-    const IGNORE: Argument<'_> =
-        Argument::new("ignore", "Ignore the given directory").short('i').value(Value::new("PATH").required());
+    const IGNORE: Argument<'_> = Argument::new("exclude", "Exclude the given directory from the listing")
+        .short('e')
+        .value(Value::new("PATH").required());
 
     Command::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -183,7 +184,7 @@ where
         Short('g') | Long("group") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_group(arguments)
         }
-        Short('i') | Long("ignore") if arguments.command.is_some() => self::parse_ignore(arguments, parser),
+        Short('e') | Long("exclude") if arguments.command.is_some() => self::parse_exclude(arguments, parser),
         Positional(value) => self::parse_positional(arguments, value),
         _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
     }
@@ -433,8 +434,8 @@ fn parse_group(arguments: &mut Arguments) -> Option<ParseResult> {
     None
 }
 
-/// Parses the ignore command-line argument.
-fn parse_ignore<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
+/// Parses the exclude command-line argument.
+fn parse_exclude<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
 where
     I: Iterator<Item = &'p str>,
 {
@@ -442,7 +443,7 @@ where
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
-        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing ignored path"));
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing excluded path"));
     };
     let path = match std::fs::canonicalize(path) {
         Ok(path) => path,
@@ -451,8 +452,8 @@ where
 
     match arguments.command.as_mut() {
         None => unreachable!(),
-        Some(SubCommand::List(arguments)) => arguments.ignored.get_or_insert_default().add(path),
-        Some(SubCommand::Tree(arguments)) => arguments.ignored.get_or_insert_default().add(path),
+        Some(SubCommand::List(arguments)) => arguments.excluded.get_or_insert_default().add(path),
+        Some(SubCommand::Tree(arguments)) => arguments.excluded.get_or_insert_default().add(path),
     }
 
     None
