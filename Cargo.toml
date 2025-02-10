@@ -40,4 +40,4 @@ ryu = "~1.0"
 supports-color = "~3.0"
 time = { version = "~0.3", features = ["formatting", "local-offset", "macros"] }
 thiserror = "~2.0"
-uzers = { version = "~0.12", default-features = false, features = ["cache"] }
+uzers = { version = "~0.12", default-features = false }
