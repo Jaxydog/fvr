@@ -90,7 +90,7 @@ impl Section for NameSection {
         } else {
             // We purposefully do not color the name for non-hidden files since uncolored text is brighter than white
             // for some terminal themes, and leaving it as such makes it easier to differentiate.
-            if entry.is_hidden() { writev!(f, [name] in BrightBlack) } else { writev!(f, [name]) }
+            if entry.is_hidden() { writev!(f, [name] in White) } else { writev!(f, [name] in Default) }
         }
     }
 }
@@ -135,7 +135,7 @@ impl Section for SymlinkSection {
         let resolved = std::fs::read_link(entry.path)?;
 
         if resolved.try_exists()? {
-            writev!(f, [b" ", Self::LINKED_ARROW, b" "] in BrightBlack)?;
+            writev!(f, [b" ", Self::LINKED_ARROW, b" "] in White)?;
         } else {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "] in BrightRed)?;
         }

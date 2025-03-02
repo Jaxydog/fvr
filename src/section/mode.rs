@@ -208,19 +208,18 @@ impl Section for ModeSection {
         W: Write,
         F: Filter,
     {
-        writev!(f, [b"["] in BrightBlack)?;
+        writev!(f, [b"["] in White)?;
 
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
 
         match Self::get_type(mode) {
-            v @ Self::TYPE_FILE => writev!(f, [&[v]] in BrightWhite)?,
             v @ Self::TYPE_DIRECTORY => writev!(f, [&[v]] in BrightBlue)?,
             v @ Self::TYPE_SYMBOLIC_LINK => writev!(f, [&[v]] in BrightCyan)?,
             v @ Self::TYPE_FIFO_PIPE => writev!(f, [&[v]] in BrightYellow)?,
             v @ Self::TYPE_SOCKET => writev!(f, [&[v]] in BrightGreen)?,
             v @ Self::TYPE_BLOCK_DEVICE => writev!(f, [&[v]] in BrightRed)?,
             v @ Self::TYPE_CHARACTER_DEVICE => writev!(f, [&[v]] in BrightMagenta)?,
-            v @ Self::TYPE_UNKNOWN => writev!(f, [&[v]] in BrightBlack)?,
+            v @ (Self::TYPE_FILE | Self::TYPE_UNKNOWN) => writev!(f, [&[v]] in BrightBlack)?,
             _ => unreachable!(),
         }
 
@@ -243,6 +242,6 @@ impl Section for ModeSection {
         }
 
         writev!(f, [&buffer])?;
-        writev!(f, [b"]"] in BrightBlack)
+        writev!(f, [b"]"] in White)
     }
 }
