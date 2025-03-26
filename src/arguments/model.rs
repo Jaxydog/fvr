@@ -288,18 +288,16 @@ impl Sort<(PathBuf, Metadata)> for SortOrder {
     fn compare(&self, lhs: &(PathBuf, Metadata), rhs: &(PathBuf, Metadata)) -> std::cmp::Ordering {
         use recomposition::sort::{order, partial_order};
 
-        use crate::files::is_hidden;
-
         match self {
-            Self::Name => order().compare(lhs.0.as_os_str(), rhs.0.as_os_str()),
-            Self::Accessed => partial_order().reverse().compare(&lhs.1.accessed().ok(), &rhs.1.accessed().ok()),
-            Self::Created => partial_order().reverse().compare(&lhs.1.created().ok(), &rhs.1.created().ok()),
-            Self::Modified => partial_order().reverse().compare(&lhs.1.modified().ok(), &rhs.1.modified().ok()),
-            Self::Size => order().compare(&lhs.1.size(), &rhs.1.size()),
-            Self::Hidden => order().reverse().compare(&is_hidden(&lhs.0), &is_hidden(&rhs.0)),
-            Self::Directories => order().reverse().compare(&lhs.1.is_dir(), &rhs.1.is_dir()),
-            Self::Files => order().reverse().compare(&lhs.1.is_file(), &rhs.1.is_file()),
-            Self::Symlinks => order().reverse().compare(&lhs.1.is_symlink(), &rhs.1.is_symlink()),
+            Self::Name => order().map_ref(Path::as_os_str).compare(&lhs.0, &rhs.0),
+            Self::Accessed => partial_order().reverse().map(|m: &Metadata| m.accessed().ok()).compare(&lhs.1, &rhs.1),
+            Self::Created => partial_order().reverse().map(|m: &Metadata| m.created().ok()).compare(&lhs.1, &rhs.1),
+            Self::Modified => partial_order().reverse().map(|m: &Metadata| m.modified().ok()).compare(&lhs.1, &rhs.1),
+            Self::Size => order().map(MetadataExt::size).compare(&lhs.1, &rhs.1),
+            Self::Hidden => order().reverse().map(|p| crate::files::is_hidden(p)).compare(&lhs.0, &rhs.0),
+            Self::Directories => order().reverse().map(Metadata::is_dir).compare(&lhs.1, &rhs.1),
+            Self::Files => order().reverse().map(Metadata::is_file).compare(&lhs.1, &rhs.1),
+            Self::Symlinks => order().reverse().map(Metadata::is_symlink).compare(&lhs.1, &rhs.1),
             Self::Reverse(sort_order) => sort_order.reverse().compare(lhs, rhs),
             Self::Then(orders) => (&orders.0).then(&orders.1).compare(lhs, rhs),
         }

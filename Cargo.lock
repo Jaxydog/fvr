@@ -91,7 +91,7 @@ dependencies = [
 [[package]]
 name = "recomposition"
 version = "0.1.0"
-source = "git+https://github.com/Jaxydog/recomposition#9018cb154f54fe344c78848ebd0119637fce242b"
+source = "git+https://github.com/Jaxydog/recomposition#f4c722484fea400f9244626299cc2554a9c8d661"
 
 [[package]]
 name = "ryu"
