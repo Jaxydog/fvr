@@ -16,12 +16,15 @@
 
 //! Implements sections related to entry names.
 
+use std::fs::Metadata;
 use std::io::{Result, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
+
+use recomposition::filter::Filter;
 
 use super::Section;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 use crate::writev;
 
 /// A [`Section`] that writes an entry's name.
@@ -47,12 +50,11 @@ impl NameSection {
 }
 
 impl Section for NameSection {
-    fn write_plain<W: Write, F: Filter>(
-        &self,
-        f: &mut W,
-        parents: &[&Rc<Entry<F>>],
-        entry: &Rc<Entry<F>>,
-    ) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter<(PathBuf, Metadata)>,
+    {
         let name = if self.trim_paths { entry.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
 
         if entry.is_dir() {
@@ -66,12 +68,11 @@ impl Section for NameSection {
         if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
     }
 
-    fn write_color<W: Write, F: Filter>(
-        &self,
-        f: &mut W,
-        parents: &[&Rc<Entry<F>>],
-        entry: &Rc<Entry<F>>,
-    ) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter<(PathBuf, Metadata)>,
+    {
         let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or(entry.path.as_os_str());
         let name = name.as_encoded_bytes();
 
@@ -110,7 +111,7 @@ impl Section for SymlinkSection {
     fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let resolved = std::fs::read_link(entry.path)?;
 
@@ -130,7 +131,7 @@ impl Section for SymlinkSection {
     fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let resolved = std::fs::read_link(entry.path)?;
 

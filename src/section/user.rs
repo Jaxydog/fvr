@@ -19,14 +19,16 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::fs::Metadata;
 use std::io::{Result, Write};
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+
+use recomposition::filter::Filter;
 
 use super::Section;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 use crate::writev;
 
 /// The byte used when the user is missing.
@@ -80,12 +82,11 @@ impl UserSection {
 }
 
 impl Section for UserSection {
-    fn write_plain<W: Write, F: Filter>(
-        &self,
-        f: &mut W,
-        parents: &[&Rc<Entry<F>>],
-        entry: &Rc<Entry<F>>,
-    ) -> Result<()> {
+    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter<(PathBuf, Metadata)>,
+    {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
         let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
@@ -97,12 +98,11 @@ impl Section for UserSection {
         writev!(f, [user.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W: Write, F: Filter>(
-        &self,
-        f: &mut W,
-        parents: &[&Rc<Entry<F>>],
-        entry: &Rc<Entry<F>>,
-    ) -> Result<()> {
+    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    where
+        W: Write,
+        F: Filter<(PathBuf, Metadata)>,
+    {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
         let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
@@ -162,7 +162,7 @@ impl Section for GroupSection {
     fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let length = Self::max_len(parents[parents.len() - 1].path);
 
@@ -178,7 +178,7 @@ impl Section for GroupSection {
     fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let length = Self::max_len(parents[parents.len() - 1].path);
 

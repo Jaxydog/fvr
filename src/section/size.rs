@@ -18,15 +18,17 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fs::Metadata;
 use std::io::{Result, Write};
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+
+use recomposition::filter::Filter;
 
 use super::Section;
 use crate::arguments::model::SizeVisibility;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 use crate::writev;
 
 /// Defines human-readable units.
@@ -180,7 +182,7 @@ impl Section for SizeSection {
     fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         if entry.is_dir() {
             return match self.visibility {
@@ -241,7 +243,7 @@ impl Section for SizeSection {
     fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         if entry.is_dir() {
             return match self.visibility {

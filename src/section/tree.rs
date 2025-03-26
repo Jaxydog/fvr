@@ -16,12 +16,15 @@
 
 //! Implements a section that provides branches for tree-based views.
 
+use std::fs::Metadata;
 use std::io::{Result, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
+
+use recomposition::filter::Filter;
 
 use super::Section;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 use crate::writev;
 
 /// A [`Section`] that writes branches for tree-based views.
@@ -49,7 +52,7 @@ impl Section for TreeSection {
     fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let depth = parents.len();
 
@@ -78,7 +81,7 @@ impl Section for TreeSection {
     fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let depth = parents.len();
 

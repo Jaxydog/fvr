@@ -17,6 +17,7 @@ version = "0.1.0"
 dependencies = [
  "itoa",
  "owo-colors",
+ "recomposition",
  "ryu",
  "supports-color",
  "thiserror",
@@ -86,6 +87,11 @@ checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "recomposition"
+version = "0.1.0"
+source = "git+https://github.com/Jaxydog/recomposition#9018cb154f54fe344c78848ebd0119637fce242b"
 
 [[package]]
 name = "ryu"

@@ -16,9 +16,12 @@
 
 //! Implements sections related to entry timestamps.
 
+use std::fs::Metadata;
 use std::io::{Result, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
 
+use recomposition::filter::Filter;
 use time::format_description::BorrowedFormatItem;
 use time::format_description::well_known::Iso8601;
 use time::{OffsetDateTime, UtcOffset};
@@ -26,7 +29,6 @@ use time::{OffsetDateTime, UtcOffset};
 use super::Section;
 use crate::arguments::model::TimeVisibility;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 use crate::writev;
 
 /// The byte used when the creation date cannot be determined.
@@ -99,7 +101,7 @@ impl Section for TimeSection {
     fn write_plain<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let Some(timestamp) = entry.data.and_then(|v| match self.kind {
             TimeSectionType::Created => v.created().ok(),
@@ -126,7 +128,7 @@ impl Section for TimeSection {
     fn write_color<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let Some(timestamp) = entry.data.and_then(|v| match self.kind {
             TimeSectionType::Created => v.created().ok(),

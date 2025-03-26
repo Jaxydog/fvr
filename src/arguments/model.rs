@@ -17,10 +17,11 @@
 //! Defines the command's argument data types.
 
 use std::collections::HashSet;
+use std::fs::Metadata;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::files::sort::Sort;
+use recomposition::sort::Sort;
 
 /// The program's command-line arguments.
 #[derive(Default)]
@@ -281,25 +282,27 @@ impl SortOrder {
             _ => self,
         }
     }
+}
 
-    /// Compiles this [`SortOrder`] into a valid [`Sort`] implementation.
-    #[inline]
-    pub fn compile(&self) -> impl Sort {
-        use crate::files::sort::{by, extract, try_extract};
+impl Sort<(PathBuf, Metadata)> for SortOrder {
+    fn compare(&self, lhs: &(PathBuf, Metadata), rhs: &(PathBuf, Metadata)) -> std::cmp::Ordering {
+        use recomposition::sort::{order, partial_order};
 
-        by(move |lhs, rhs| match self {
-            Self::Name => extract(|v, _| v.as_os_str().to_os_string()).sort(lhs, rhs),
-            Self::Accessed => try_extract(|_, v| v.accessed()).reverse().sort(lhs, rhs),
-            Self::Created => try_extract(|_, v| v.created()).reverse().sort(lhs, rhs),
-            Self::Modified => try_extract(|_, v| v.modified()).reverse().sort(lhs, rhs),
-            Self::Size => extract(|_, v| v.is_dir()).then(extract(|_, v| v.size()).reverse()).sort(lhs, rhs),
-            Self::Hidden => extract(|v, _| crate::files::is_hidden(v)).reverse().sort(lhs, rhs),
-            Self::Directories => extract(|_, v| v.is_dir()).reverse().sort(lhs, rhs),
-            Self::Files => extract(|_, v| v.is_file()).reverse().sort(lhs, rhs),
-            Self::Symlinks => extract(|_, v| v.is_symlink()).reverse().sort(lhs, rhs),
-            Self::Reverse(v) => v.compile().reverse().sort(lhs, rhs),
-            Self::Then(orders) => orders.0.compile().then(orders.1.compile()).sort(lhs, rhs),
-        })
+        use crate::files::is_hidden;
+
+        match self {
+            Self::Name => order().compare(lhs.0.as_os_str(), rhs.0.as_os_str()),
+            Self::Accessed => partial_order().reverse().compare(&lhs.1.accessed().ok(), &rhs.1.accessed().ok()),
+            Self::Created => partial_order().reverse().compare(&lhs.1.created().ok(), &rhs.1.created().ok()),
+            Self::Modified => partial_order().reverse().compare(&lhs.1.modified().ok(), &rhs.1.modified().ok()),
+            Self::Size => order().compare(&lhs.1.size(), &rhs.1.size()),
+            Self::Hidden => order().reverse().compare(&is_hidden(&lhs.0), &is_hidden(&rhs.0)),
+            Self::Directories => order().reverse().compare(&lhs.1.is_dir(), &rhs.1.is_dir()),
+            Self::Files => order().reverse().compare(&lhs.1.is_file(), &rhs.1.is_file()),
+            Self::Symlinks => order().reverse().compare(&lhs.1.is_symlink(), &rhs.1.is_symlink()),
+            Self::Reverse(sort_order) => sort_order.reverse().compare(lhs, rhs),
+            Self::Then(orders) => (&orders.0).then(&orders.1).compare(lhs, rhs),
+        }
     }
 }
 

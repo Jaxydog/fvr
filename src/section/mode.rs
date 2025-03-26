@@ -16,13 +16,16 @@
 
 //! Implements a section that displays an entry's file type and permissions.
 
+use std::fs::Metadata;
 use std::io::{Result, Write};
 use std::os::unix::fs::MetadataExt;
+use std::path::PathBuf;
 use std::rc::Rc;
+
+use recomposition::filter::Filter;
 
 use super::Section;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 use crate::{color_bytes, writev};
 
 /// Defines constants related to file entry types.
@@ -195,7 +198,7 @@ impl Section for ModeSection {
     fn write_plain<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
         let permissions = Self::get_permissions(mode);
@@ -206,7 +209,7 @@ impl Section for ModeSection {
     fn write_color<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         writev!(f, [b"["] in White)?;
 

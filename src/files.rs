@@ -25,15 +25,15 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
 use std::rc::Rc;
 
-use self::filter::Filter;
-use self::sort::Sort;
-
-pub mod filter;
-pub mod sort;
+use recomposition::filter::Filter;
+use recomposition::sort::{ListSortExt, Sort};
 
 /// An entry returned by a visit call.
 #[derive(Clone, Debug)]
-pub struct Entry<'e, F: Filter> {
+pub struct Entry<'e, F>
+where
+    F: Filter<(PathBuf, Metadata)>,
+{
     /// The entry's file path.
     pub path: &'e Path,
     /// The entry's metadata.
@@ -50,7 +50,10 @@ pub struct Entry<'e, F: Filter> {
     has_children_cache: OnceCell<bool>,
 }
 
-impl<'e, F: Filter> Entry<'e, F> {
+impl<'e, F> Entry<'e, F>
+where
+    F: Filter<(PathBuf, Metadata)>,
+{
     /// Creates a new [`Entry`] using the given path and optional data.
     #[inline]
     #[must_use]
@@ -136,7 +139,7 @@ impl<'e, F: Filter> Entry<'e, F> {
             self.is_dir()
                 && std::fs::read_dir(self.path).is_ok_and(|mut v| {
                     // Search for at least one child that matches the filter.
-                    v.any(|v| v.as_ref().is_ok_and(|v| v.metadata().is_ok_and(|m| self.filter.filter(&v.path(), &m))))
+                    v.any(|v| v.as_ref().is_ok_and(|v| v.metadata().is_ok_and(|m| self.filter.test(&(v.path(), m)))))
                 })
         })
     }
@@ -151,16 +154,16 @@ impl<'e, F: Filter> Entry<'e, F> {
 /// This function will return an error if the entry's children could not be accessed or the closure fails.
 pub fn visit_entries<F, S, V>(entry: &Rc<Entry<F>>, filter: &F, sort: &S, mut visit: V) -> Result<()>
 where
-    F: Filter,
-    S: Sort,
+    F: Filter<(PathBuf, Metadata)>,
+    S: Sort<(PathBuf, Metadata)>,
     V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
 {
     let mut collection = std::fs::read_dir(entry.path)?
         .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path(), d))))
-        .filter(|v| v.as_ref().map_or(true, |v| filter.filter(&v.0, &v.1)))
+        .filter(|v| v.as_ref().map_or(true, |v| filter.test(v)))
         .collect::<Result<Box<[(PathBuf, Metadata)]>>>()?;
 
-    collection.sort_unstable_by(|lhs, rhs| sort.sort((&lhs.0, &lhs.1), (&rhs.0, &rhs.1)));
+    collection.sort_unstable_with(sort);
 
     let total = collection.len();
 
@@ -180,15 +183,15 @@ where
 /// This function will return an error if an entry's children could not be accessed or the closure fails.
 pub fn visit_entries_recursive<F, S, V>(entry: &Rc<Entry<F>>, filter: &F, sort: &S, visit: &mut V) -> Result<()>
 where
-    F: Filter,
-    S: Sort,
+    F: Filter<(PathBuf, Metadata)>,
+    S: Sort<(PathBuf, Metadata)>,
     V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
 {
     #[inline]
     fn inner<F, S, V>(entries: &[&Rc<Entry<F>>], filter: &F, sort: &S, visit: &mut V) -> Result<()>
     where
-        F: Filter,
-        S: Sort,
+        F: Filter<(PathBuf, Metadata)>,
+        S: Sort<(PathBuf, Metadata)>,
         V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
     {
         let Some(entry) = entries.last() else { unreachable!() };

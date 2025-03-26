@@ -34,11 +34,10 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command.as_ref() else { unreachable!() };
 
     let sort = tree_arguments.sorting.clone().unwrap_or_default();
-    let sort = sort.compile();
-    let filter = crate::files::filter::by(|v, _| {
-        (tree_arguments.show_hidden || !is_hidden(v))
-            && tree_arguments.included.as_ref().is_none_or(|i| i.has(v))
-            && !tree_arguments.excluded.as_ref().is_some_and(|e| e.has(v))
+    let filter = recomposition::filter::from_fn(|(path, _)| {
+        (tree_arguments.show_hidden || !is_hidden(path))
+            && tree_arguments.included.as_ref().is_none_or(|include| include.has(path))
+            && !tree_arguments.excluded.as_ref().is_some_and(|exclude| exclude.has(path))
     });
 
     let name_section = NameSection::new(true, tree_arguments.resolve_symlinks);

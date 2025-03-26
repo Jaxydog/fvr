@@ -16,12 +16,15 @@
 
 //! Provides custom display implementations for various types of file entry data.
 
+use std::fs::Metadata;
 use std::io::{Result, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
+
+use recomposition::filter::Filter;
 
 use crate::arguments::model::ColorChoice;
 use crate::files::Entry;
-use crate::files::filter::Filter;
 
 pub mod mode;
 pub mod name;
@@ -41,7 +44,7 @@ pub trait Section {
     fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter;
+        F: Filter<(PathBuf, Metadata)>;
 
     /// Writes this section into the given writer using color.
     ///
@@ -51,7 +54,7 @@ pub trait Section {
     fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter;
+        F: Filter<(PathBuf, Metadata)>;
 
     /// Writes this section into the given writer, determining whether to use color based on the given [`ColorChoice`].
     ///
@@ -61,7 +64,7 @@ pub trait Section {
     fn write<W, F>(&self, color: ColorChoice, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
         W: Write,
-        F: Filter,
+        F: Filter<(PathBuf, Metadata)>,
     {
         use supports_color::{Stream, on_cached};
 
