@@ -146,6 +146,7 @@ impl ModeSection {
     pub const TYPE_UNKNOWN: u8 = b'?';
 
     /// Creates a new [`ModeSection`].
+    #[inline]
     #[must_use]
     pub const fn new(extended: bool) -> Self {
         Self { extended }

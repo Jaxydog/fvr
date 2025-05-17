@@ -72,24 +72,28 @@ pub struct TimeSection {
 
 impl TimeSection {
     /// Creates a new [`TimeSection`].
+    #[inline]
     #[must_use]
     pub const fn new(visibility: TimeVisibility, kind: TimeSectionType) -> Self {
         Self { visibility, kind }
     }
 
     /// Creates a new [`TimeSection`] for a creation date timestamp.
+    #[inline]
     #[must_use]
     pub const fn created(visibility: TimeVisibility) -> Self {
         Self::new(visibility, TimeSectionType::Created)
     }
 
     /// Creates a new [`TimeSection`] for an access date timestamp.
+    #[inline]
     #[must_use]
     pub const fn accessed(visibility: TimeVisibility) -> Self {
         Self::new(visibility, TimeSectionType::Accessed)
     }
 
     /// Creates a new [`TimeSection`] for a modification date timestamp.
+    #[inline]
     #[must_use]
     pub const fn modified(visibility: TimeVisibility) -> Self {
         Self::new(visibility, TimeSectionType::Modified)

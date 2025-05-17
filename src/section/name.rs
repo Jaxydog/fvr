@@ -43,6 +43,7 @@ impl NameSection {
     pub const EXE_SUFFIX: &[u8] = b"*";
 
     /// Creates a new [`NameSection`].
+    #[inline]
     #[must_use]
     pub const fn new(trim_paths: bool, resolve_symlinks: bool) -> Self {
         Self { trim_paths, resolve_symlinks }

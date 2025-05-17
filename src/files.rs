@@ -126,6 +126,7 @@ where
     }
 
     /// Returns the file name of this [`Entry`].
+    #[inline]
     pub fn file_name(&self) -> Option<&OsStr> {
         // This call can be expensive, so we cache the result.
         self.file_name_cache.get_or_init(|| self.path.file_name().map(Box::from)).as_deref()

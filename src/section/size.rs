@@ -149,6 +149,7 @@ impl SizeSection {
     pub const WIDTH_SIMPLE: usize = 20;
 
     /// Creates a new [`SizeSection`].
+    #[inline]
     #[must_use]
     pub const fn new(visibility: SizeVisibility) -> Self {
         Self { visibility }
