@@ -24,6 +24,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use ahash::RandomState;
 use recomposition::filter::Filter;
 
 use super::Section;
@@ -156,7 +157,7 @@ impl SizeSection {
     /// Returns the maximum length that all simple size sections in the given directory will take up.
     fn max_simple_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<HashMap<Box<Path>, usize>> = RefCell::new(HashMap::new());
+            static CACHE: RefCell<HashMap<Box<Path>, usize, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|cache| {

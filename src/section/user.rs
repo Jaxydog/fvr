@@ -25,6 +25,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use ahash::RandomState;
 use recomposition::filter::Filter;
 
 use super::Section;
@@ -46,7 +47,7 @@ impl UserSection {
     /// Returns the user name associated with the given user identifier.
     fn name(uid: u32) -> Option<Rc<OsStr>> {
         thread_local! {
-            static CACHE: RefCell<HashMap<u32, Option<Rc<OsStr>>>> = RefCell::new(HashMap::new());
+            static CACHE: RefCell<HashMap<u32, Option<Rc<OsStr>>, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|v| {
@@ -57,7 +58,7 @@ impl UserSection {
     /// Returns the maximum length that all user sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<HashMap<Box<Path>, usize>> = RefCell::new(HashMap::new());
+            static CACHE: RefCell<HashMap<Box<Path>, usize, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|cache| {
@@ -123,7 +124,7 @@ impl GroupSection {
     /// Returns the group name associated with the given group identifier.
     fn name(gid: u32) -> Option<Rc<OsStr>> {
         thread_local! {
-            static CACHE: RefCell<HashMap<u32, Option<Rc<OsStr>>>> = RefCell::new(HashMap::new());
+            static CACHE: RefCell<HashMap<u32, Option<Rc<OsStr>>, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|v| {
@@ -134,7 +135,7 @@ impl GroupSection {
     /// Returns the maximum length that all group sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<HashMap<Box<Path>, usize>> = RefCell::new(HashMap::new());
+            static CACHE: RefCell<HashMap<Box<Path>, usize, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|cache| {

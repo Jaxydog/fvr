@@ -32,6 +32,9 @@ use std::process::ExitCode;
 use self::arguments::ParseResult;
 use self::arguments::model::SubCommand;
 
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub mod arguments;
 pub mod files;
 pub mod section;
