@@ -74,10 +74,9 @@ impl<A: ArgumentLike, I: Iterator<Item = A>> Parser<A, I> {
         if !matches!(
             self.state,
             ParserState::Start { arguments_closed: true } | ParserState::Finished { arguments_closed: true }
-        ) {
-            if let Ok(Some(argument)) = self.next_parameter() {
-                return Ok(Some(argument.into()));
-            }
+        ) && let Ok(Some(argument)) = self.next_parameter()
+        {
+            return Ok(Some(argument.into()));
         }
 
         self.next_positional().map(|v| v.map(Argument::Positional))
