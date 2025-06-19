@@ -23,6 +23,8 @@ use std::path::{Path, PathBuf};
 
 use recomposition::sort::Sort;
 
+use crate::arguments::schema::CommandSchema;
+
 /// The program's command-line arguments.
 #[derive(Default)]
 pub struct Arguments {
@@ -39,10 +41,10 @@ impl Arguments {
     ///
     /// Panics if the current schema has not been defined.
     #[expect(clippy::expect_used, reason = "we cannot return a schema for a sub-command if it has not been defined")]
-    pub const fn current_schema(&self) -> super::schema::Command<'static> {
+    pub const fn current_schema(&self) -> CommandSchema<'static> {
         #[inline]
-        const fn sub_schema(index: usize) -> super::schema::Command<'static> {
-            let list = super::SCHEMA.sub_commands.expect("no sub-commands have been defined");
+        const fn sub_schema(index: usize) -> CommandSchema<'static> {
+            let list = super::SCHEMA.commands.expect("no sub-commands have been defined");
 
             assert!(index < list.len(), "missing required sub-command definition");
 
