@@ -16,7 +16,6 @@
 
 //! Defines the command's argument data types.
 
-use std::collections::HashSet;
 use std::fs::Metadata;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -193,24 +192,26 @@ pub struct TreeArguments {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Paths {
     /// The inner set of paths.
-    inner: HashSet<Box<Path>>,
+    inner: Vec<Box<Path>>,
 }
 
 impl Paths {
     /// Creates a new [`Paths`].
     #[must_use]
-    pub fn new() -> Self {
-        Self { inner: HashSet::new() }
+    pub const fn new() -> Self {
+        Self { inner: Vec::new() }
     }
 
     /// Returns `true` if this value contains the given path.
     pub fn has(&self, path: impl AsRef<Path>) -> bool {
-        self.inner.contains(path.as_ref())
+        self.inner.iter().any(|p| &(**p) == path.as_ref())
     }
 
     /// Adds the given path to the list.
-    pub fn add(&mut self, path: impl AsRef<Path>) {
-        self.inner.insert(Box::from(path.as_ref()));
+    pub fn add(&mut self, path: Box<Path>) {
+        if !self.has(&path) {
+            self.inner.push(path);
+        }
     }
 
     /// Returns an iterator of the inner paths.
@@ -220,13 +221,13 @@ impl Paths {
 
     /// Returns the number of paths.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.inner.len()
     }
 
     /// Returns `true` if no paths have been added.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 }

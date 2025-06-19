@@ -216,7 +216,7 @@ pub fn parse_arguments() -> ParseResult {
 
     if paths.is_empty() {
         match std::env::current_dir().and_then(|v| v.canonicalize()) {
-            Ok(path) => paths.add(path),
+            Ok(path) => paths.add(path.into_boxed_path()),
             Err(error) => return self::exit_and_print(ERROR_GENERIC, error),
         }
     }
@@ -276,7 +276,7 @@ fn parse_positional(arguments: &mut Arguments, value: &str) -> Option<ParseResul
         let (SubCommand::List(ListArguments { paths, .. }) | SubCommand::Tree(TreeArguments { paths, .. })) = command;
 
         match Path::new(value).canonicalize() {
-            Ok(path) => paths.add(path),
+            Ok(path) => paths.add(path.into_boxed_path()),
             Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
         }
     } else {
@@ -526,7 +526,7 @@ where
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing excluded path"));
     };
     let path = match std::fs::canonicalize(path) {
-        Ok(path) => path,
+        Ok(path) => path.into_boxed_path(),
         Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
     };
 
@@ -551,7 +551,7 @@ where
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing included path"));
     };
     let path = match std::fs::canonicalize(path) {
-        Ok(path) => path,
+        Ok(path) => path.into_boxed_path(),
         Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
     };
 
