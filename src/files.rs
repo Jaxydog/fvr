@@ -245,15 +245,7 @@ where
 
     let mut root_components = root.components();
     let mut path_components = path.components();
-
-    let capacity = {
-        let (root_min, root_max) = root_components.size_hint();
-        let (path_min, path_max) = path_components.size_hint();
-
-        root_max.unwrap_or(root_min).max(path_max.unwrap_or(path_min))
-    };
-
-    let mut components = Vec::with_capacity(capacity);
+    let mut components = PathBuf::with_capacity(root.as_os_str().len().max(path.as_os_str().len()));
 
     loop {
         match (root_components.next(), path_components.next()) {
@@ -265,7 +257,7 @@ where
                 break;
             }
             (_, None) => components.push(Component::ParentDir),
-            (Some(root), Some(path)) if components.is_empty() && root == path => {}
+            (Some(root), Some(path)) if components.as_os_str().is_empty() && root == path => {}
             (Some(Component::CurDir), Some(path)) => components.push(path),
             (Some(Component::ParentDir), Some(_)) => return None,
             (Some(_), Some(path)) => {
@@ -280,5 +272,5 @@ where
         }
     }
 
-    Some(components.into_iter().collect())
+    Some(components)
 }
