@@ -58,11 +58,11 @@ impl UserSection {
     /// Returns the maximum length that all user sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<HashMap<Box<Path>, usize, RandomState>> = RefCell::new(HashMap::default());
+            static CACHE: RefCell<HashMap<Box<OsStr>, usize, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|cache| {
-            if let Some(len) = cache.borrow().get(parent).copied() {
+            if let Some(len) = cache.borrow().get(parent.as_os_str()).copied() {
                 return len;
             }
 
@@ -75,7 +75,7 @@ impl UserSection {
                 })
                 .unwrap_or(MAX_LEN);
 
-            cache.borrow_mut().insert(Box::from(parent), len);
+            cache.borrow_mut().insert(Box::from(parent.as_os_str()), len);
 
             len
         })
@@ -135,11 +135,11 @@ impl GroupSection {
     /// Returns the maximum length that all group sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<HashMap<Box<Path>, usize, RandomState>> = RefCell::new(HashMap::default());
+            static CACHE: RefCell<HashMap<Box<OsStr>, usize, RandomState>> = RefCell::new(HashMap::default());
         }
 
         CACHE.with(|cache| {
-            if let Some(len) = cache.borrow().get(parent).copied() {
+            if let Some(len) = cache.borrow().get(parent.as_os_str()).copied() {
                 return len;
             }
 
@@ -152,7 +152,7 @@ impl GroupSection {
                 })
                 .unwrap_or(MAX_LEN);
 
-            cache.borrow_mut().insert(Box::from(parent), len);
+            cache.borrow_mut().insert(Box::from(parent.as_os_str()), len);
 
             len
         })
