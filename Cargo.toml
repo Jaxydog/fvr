@@ -34,9 +34,9 @@ lto = "fat"
 strip = "symbols"
 
 [dependencies]
-ahash = "~0.8"
+ahash = { version = "~0.8", default-features = false, features = ["compile-time-rng", "std"] }
 itoa = "~1.0"
-mimalloc = "~0.1"
+mimalloc = { version = "~0.1", features = ["v3"] }
 owo-colors = "~4.2"
 recomposition = { version = "~0.1", git = "https://github.com/Jaxydog/recomposition" }
 ryu = "~1.0"
