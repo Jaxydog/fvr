@@ -34,10 +34,10 @@ lto = "fat"
 strip = "symbols"
 
 [dependencies]
-ahash = { version = "~0.8", default-features = false, features = ["compile-time-rng", "std"] }
 itoa = "~1.0"
 mimalloc = { version = "~0.1", features = ["v3"] }
 owo-colors = "~4.2"
+rapidhash = { version = "~4.1", features = ["nightly", "unsafe"] }
 recomposition = { version = "~0.1", git = "https://github.com/Jaxydog/recomposition" }
 ryu = "~1.0"
 supports-color = "~3.0"
