@@ -39,7 +39,7 @@ pub const SCHEMA: CommandSchema<'static> = {
     const PATHS_VALUE: ValueSchema<'static> =
         ValueSchemaBuilder::new("PATHS").about("The paths to display").list().build();
     const PATH_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("PATH").about("The path").required().build();
-    const COLOR_CHOICE_VALUE: ValueSchema<'static> =
+    const COLOR_VALUE: ValueSchema<'static> =
         ValueSchemaBuilder::new("CHOICE").required().default("auto").options(&["auto", "always", "never"]).build();
     const SORT_ORDER_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("ORDER")
         .required()
@@ -62,65 +62,42 @@ pub const SCHEMA: CommandSchema<'static> = {
     const HELP_ARGUMENT: ArgumentSchema<'static> =
         ArgumentSchemaBuilder::new("help", "Shows the command's usage").short('h').build();
     const COLOR_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("color", "Determines whether to output using color")
-            .value(COLOR_CHOICE_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("color", "Determines whether to output using color").value(COLOR_VALUE).build();
     const ALL_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("all", "Show all entries, including hidden files and directories")
-            .short('a')
-            .build();
+        ArgumentSchemaBuilder::new("all", "Include hidden files and directories").short('a').build();
     const EXCLUDE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("exclude", "Exclude a directory from the command output")
-            .short('e')
-            .value(PATH_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("exclude", "Exclude a directory from output").short('e').value(PATH_VALUE).build();
     const INCLUDE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("include", "Include a directory in the command output")
-            .short('i')
-            .value(PATH_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("include", "Include a directory in the output").short('i').value(PATH_VALUE).build();
     const RESOLVE_SYMLINKS_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("resolve-symlinks", "Display the fully resolved target file for symbolic links")
-            .short('r')
-            .build();
+        ArgumentSchemaBuilder::new("resolve-symlinks", "Fully resolve symbolic link paths").short('r').build();
     const SORT_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("sort", "Sort all entries by the specified ordering")
-            .value(SORT_ORDER_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("sort", "Control how entries are sorted").value(SORT_ORDER_VALUE).build();
 
     const MODE_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("CHOICE").default("hide").options(&["hide", "show", "extended"]).build();
-    const SIZE_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("CHOICE").default("hide").options(&["hide", "simple", "base-2", "base-10"]).build();
+        ValueSchemaBuilder::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]).build();
+    const SIZE_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("CHOICE")
+        .required()
+        .default("hide")
+        .options(&["hide", "simple", "base-2", "base-10"])
+        .build();
     const TIME_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("CHOICE").default("hide").options(&["hide", "simple", "iso8601"]).build();
+        ValueSchemaBuilder::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]).build();
 
     const MODE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("mode", "Determines whether to display the Unix mode bits for each entry")
-            .short('m')
-            .value(MODE_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("mode", "Control how entry modes are shown").short('m').value(MODE_VALUE).build();
     const SIZE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("size", "Determines whether to display each entry's file size")
-            .short('s')
-            .value(SIZE_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("size", "Control how entry sizes are shown").short('s').value(SIZE_VALUE).build();
     const CREATED_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("created", "Determines whether to display an entry's creation date")
-            .value(TIME_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("created", "Control how creation dates are shown").value(TIME_VALUE).build();
     const ACCESSED_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("accessed", "Determines whether to display an entry's access date")
-            .value(TIME_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("accessed", "Control how access dates are shown").value(TIME_VALUE).build();
     const MODIFIED_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("modified", "Determines whether to display an entry's modification date")
-            .value(TIME_VALUE)
-            .build();
+        ArgumentSchemaBuilder::new("modified", "Control how modification dates are shown").value(TIME_VALUE).build();
     const USER_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("user", "Displays the username of the owner of each entry").build();
+        ArgumentSchemaBuilder::new("user", "Show all entry user names").build();
     const GROUP_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("group", "Displays the group name of the owner of each entry").build();
+        ArgumentSchemaBuilder::new("group", "Show all entry group names").build();
 
     const LIST_COMMAND: CommandSchema<'static> =
         CommandSchemaBuilder::new("list", "List the contents of one or more directories")
@@ -161,7 +138,10 @@ pub const SCHEMA: CommandSchema<'static> = {
         ValueSchemaBuilder::new("SUBCOMMAND").options(&[LIST_COMMAND.name, TREE_COMMAND.name]).build();
 
     const HELP_WITH_SUBCOMMAND_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("help", "Shows a sub-command's usage").short('h').value(SUBCOMMAND_VALUE).build();
+        ArgumentSchemaBuilder::new("help", "Shows the command (or a sub-command)'s usage")
+            .short('h')
+            .value(SUBCOMMAND_VALUE)
+            .build();
     const VERSION_ARGUMENT: ArgumentSchema<'static> =
         ArgumentSchemaBuilder::new("version", "Shows the command's version").short('V').build();
 

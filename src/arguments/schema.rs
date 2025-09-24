@@ -96,14 +96,12 @@ pub fn write_help(schema: CommandSchema<'_>, f: &mut impl Write) -> std::io::Res
         f.write_all(b" [ARGUMENTS]")?;
     }
 
-    for ValueSchema { name, list, required, default, .. } in schema.positionals.into_iter().flat_map(|v| v.iter()) {
+    for ValueSchema { name, list, required, .. } in schema.positionals.into_iter().flat_map(|v| v.iter()) {
         write!(f, " [{name}")?;
 
-        let actually_required = *required && default.is_none();
-
         if *list {
-            f.write_all(if actually_required { b"..." } else { b"..?" })?;
-        } else if !actually_required {
+            f.write_all(if *required { b"..." } else { b"..?" })?;
+        } else if !*required {
             f.write_all(b"?")?;
         }
 
@@ -145,15 +143,14 @@ pub fn write_help(schema: CommandSchema<'_>, f: &mut impl Write) -> std::io::Res
                 write!(f, "      ")?;
             }
 
-            if let Some(ValueSchema { name, list, required, default, .. }) = value {
-                let actually_required = *required && default.is_none();
+            if let Some(ValueSchema { name, list, required, .. }) = value {
                 let mut temp = Vec::with_capacity(long.len() + 1 + name.len() + 6);
 
                 write!(&mut temp, "{long} [{name}")?;
 
                 if *list {
-                    temp.write_all(if actually_required { b"..." } else { b"..?" })?;
-                } else if !actually_required {
+                    temp.write_all(if *required { b"..." } else { b"..?" })?;
+                } else if !*required {
                     temp.write_all(b"?")?;
                 }
 
