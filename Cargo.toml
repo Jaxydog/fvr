@@ -42,5 +42,4 @@ recomposition = { version = "~0.1", git = "https://github.com/Jaxydog/recomposit
 ryu = "~1.0"
 supports-color = "~3.0"
 time = { version = "~0.3", features = ["formatting", "local-offset", "macros"] }
-thiserror = "~2.0"
 uzers = { version = "~0.12", default-features = false }

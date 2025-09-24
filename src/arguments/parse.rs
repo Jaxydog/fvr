@@ -24,20 +24,38 @@ use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 
 /// An error that may be returned while parsing command-line arguments.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum Error<A: ArgumentLike> {
     /// Returned by the parser if a cluster does not contain any arguments.
-    #[error("an empty short-form argument cluster was encountered")]
     EmptyCluster,
     /// Returned by the parser if a value is attempted to be retrieved with no prior argument.
-    #[error("attempted to retrieve value with no previous argument")]
     MissingAssignedArgument,
     /// Returned by the parser if a non-positional argument was ignored.
-    #[error("a non-positional argument was skipped")]
     SkippedNonPositional,
     /// Returned by the parser if an argument's value was ignored.
-    #[error("the value for {0} was skipped")]
     SkippedValue(Argument<A>),
+}
+
+impl<A> std::error::Error for Error<A>
+where
+    A: ArgumentLike + Display,
+    A::Short: Display,
+{
+}
+
+impl<A> Display for Error<A>
+where
+    A: ArgumentLike + Display,
+    A::Short: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyCluster => f.write_str("an empty short-form argument cluster was encountered"),
+            Self::MissingAssignedArgument => f.write_str("attempted to retrieve value with no previous argument"),
+            Self::SkippedNonPositional => f.write_str("a non-positional argument was skipped"),
+            Self::SkippedValue(argument) => write!(f, "the value for '{argument}' was skipped"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
