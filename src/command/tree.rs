@@ -55,7 +55,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
         }
 
         tree_section.write(arguments.color, f, &[], &entry)?;
-        NameSection::new(true, false).write(arguments.color, f, &[], &entry)?;
+        name_section.write(arguments.color, f, &[], &entry)?;
 
         f.write_all(b"\n")?;
 

@@ -83,7 +83,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
                 f.write_all(b"\n")?;
             }
 
-            NameSection::new(true, false).write(arguments.color, f, &[], &entry)?;
+            name_section.write(arguments.color, f, &[], &entry)?;
 
             f.write_all(b":\n")?;
         }
