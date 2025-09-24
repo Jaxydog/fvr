@@ -59,16 +59,18 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
         f.write_all(b"\n")?;
 
-        crate::files::visit_entries_recursive(&entry, &filter, &sort, &mut |parents, entry| {
-            if parents.len() > tree_section.max_depth {
-                return Ok(());
-            }
+        crate::files::visit_entries_recursive(
+            &entry,
+            tree_arguments.max_depth,
+            &filter,
+            &sort,
+            &mut |parents, entry| {
+                tree_section.write(arguments.color, f, parents, &entry)?;
+                name_section.write(arguments.color, f, parents, &entry)?;
 
-            tree_section.write(arguments.color, f, parents, &entry)?;
-            name_section.write(arguments.color, f, parents, &entry)?;
-
-            f.write_all(b"\n")
-        })?;
+                f.write_all(b"\n")
+            },
+        )?;
     }
 
     f.flush()

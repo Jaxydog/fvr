@@ -20,6 +20,7 @@ use std::cell::OnceCell;
 use std::ffi::OsStr;
 use std::fs::Metadata;
 use std::io::Result;
+use std::num::NonZero;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
@@ -182,19 +183,29 @@ where
 /// # Errors
 ///
 /// This function will return an error if an entry's children could not be accessed or the closure fails.
-pub fn visit_entries_recursive<F, S, V>(entry: &Rc<Entry<F>>, filter: &F, sort: &S, visit: &mut V) -> Result<()>
+pub fn visit_entries_recursive<F, S, V>(
+    entry: &Rc<Entry<F>>,
+    max_depth: Option<NonZero<usize>>,
+    filter: &F,
+    sort: &S,
+    visit: &mut V,
+) -> Result<()>
 where
     F: Filter<(PathBuf, Metadata)>,
     S: Sort<(PathBuf, Metadata)>,
     V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
 {
     #[inline]
-    fn inner<F, S, V>(entries: &[&Rc<Entry<F>>], filter: &F, sort: &S, visit: &mut V) -> Result<()>
+    fn inner<F, S, V>(entries: &[&Rc<Entry<F>>], max_depth: usize, filter: &F, sort: &S, visit: &mut V) -> Result<()>
     where
         F: Filter<(PathBuf, Metadata)>,
         S: Sort<(PathBuf, Metadata)>,
         V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
     {
+        if max_depth == 0 {
+            return Ok(());
+        }
+
         let Some(entry) = entries.last() else { unreachable!() };
 
         self::visit_entries(entry, filter, sort, |_, entry| {
@@ -206,14 +217,14 @@ where
                 new_entries.extend_from_slice(entries);
                 new_entries.push(&entry);
 
-                inner(&new_entries, filter, sort, visit)?;
+                inner(&new_entries, max_depth.saturating_sub(1), filter, sort, visit)?;
             }
 
             Ok(())
         })
     }
 
-    inner(&[entry], filter, sort, visit)
+    inner(&[entry], max_depth.map_or(usize::MAX, NonZero::get), filter, sort, visit)
 }
 
 /// Returns `true` if the given path is considered 'hidden'.
