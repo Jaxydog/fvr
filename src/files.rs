@@ -237,6 +237,10 @@ where
     let root = root.as_ref();
     let path = path.as_ref();
 
+    if path.is_absolute() {
+        return Some(path.to_path_buf());
+    }
+
     match (root.is_absolute(), path.is_absolute()) {
         (true, false) => return None,
         (false, true) => return Some(path.to_path_buf()),
