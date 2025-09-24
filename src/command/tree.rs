@@ -17,6 +17,7 @@
 //! Implements the tree sub-command.
 
 use std::io::Write;
+use std::num::NonZero;
 use std::rc::Rc;
 
 use crate::arguments::model::{Arguments, SubCommand};
@@ -40,6 +41,7 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
             && !tree_arguments.excluded.as_ref().is_some_and(|exclude| exclude.has(path))
     });
 
+    let tree_section = TreeSection::new(tree_arguments.max_depth.map_or(usize::MAX, NonZero::get));
     let name_section = NameSection::new(true, tree_arguments.resolve_symlinks);
 
     let f = &mut std::io::stdout().lock();
@@ -52,14 +54,17 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
             f.write_all(b"\n")?;
         }
 
-        TreeSection.write(arguments.color, f, &[], &entry)?;
+        tree_section.write(arguments.color, f, &[], &entry)?;
         NameSection::new(true, false).write(arguments.color, f, &[], &entry)?;
 
         f.write_all(b"\n")?;
 
         crate::files::visit_entries_recursive(&entry, &filter, &sort, &mut |parents, entry| {
-            TreeSection.write(arguments.color, f, parents, &entry)?;
+            if parents.len() > tree_section.max_depth {
+                return Ok(());
+            }
 
+            tree_section.write(arguments.color, f, parents, &entry)?;
             name_section.write(arguments.color, f, parents, &entry)?;
 
             f.write_all(b"\n")

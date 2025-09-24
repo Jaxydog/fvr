@@ -17,6 +17,7 @@
 //! Defines the command's argument data types.
 
 use std::fs::Metadata;
+use std::num::NonZero;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
@@ -185,6 +186,8 @@ pub struct TreeArguments {
     pub excluded: Option<Paths>,
     /// The paths to include.
     pub included: Option<Paths>,
+    /// The depth of the search.
+    pub max_depth: Option<NonZero<usize>>,
 }
 
 /// The paths to list.

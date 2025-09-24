@@ -29,7 +29,10 @@ use crate::writev;
 
 /// A [`Section`] that writes branches for tree-based views.
 #[derive(Clone, Copy, Debug)]
-pub struct TreeSection;
+pub struct TreeSection {
+    /// The number of directories deep that should be displayed.
+    pub max_depth: usize,
+}
 
 impl TreeSection {
     /// The bytes used for a bottom corner.
@@ -46,6 +49,12 @@ impl TreeSection {
     pub const SPLIT_HORIZONTAL: &[u8] = "┬".as_bytes();
     /// The bytes used for a vertical split line.
     pub const SPLIT_VERTICAL: &[u8] = "├".as_bytes();
+
+    /// Creates a new [`TreeSection`].
+    #[must_use]
+    pub const fn new(max_depth: usize) -> Self {
+        Self { max_depth }
+    }
 }
 
 impl Section for TreeSection {
@@ -61,7 +70,11 @@ impl Section for TreeSection {
         }
 
         let join = if entry.is_last() { Self::CORNER_BOTTOM } else { Self::SPLIT_VERTICAL };
-        let connect = if entry.has_children() { Self::SPLIT_HORIZONTAL } else { Self::LINE_HORIZONTAL };
+        let connect = if parents.len() < self.max_depth && entry.has_children() {
+            Self::SPLIT_HORIZONTAL
+        } else {
+            Self::LINE_HORIZONTAL
+        };
 
         let mut buffer = Vec::with_capacity(parents.len() * 2);
 
@@ -90,7 +103,11 @@ impl Section for TreeSection {
         }
 
         let join = if entry.is_last() { Self::CORNER_BOTTOM } else { Self::SPLIT_VERTICAL };
-        let connect = if entry.has_children() { Self::SPLIT_HORIZONTAL } else { Self::LINE_HORIZONTAL };
+        let connect = if parents.len() < self.max_depth && entry.has_children() {
+            Self::SPLIT_HORIZONTAL
+        } else {
+            Self::LINE_HORIZONTAL
+        };
 
         let mut buffer = Vec::with_capacity(parents.len() * 2);
 

@@ -17,6 +17,7 @@
 //! Provides the command's arguments and implements a method for parsing them.
 
 use std::fmt::Display;
+use std::num::IntErrorKind;
 use std::path::Path;
 
 use self::model::{
@@ -83,6 +84,7 @@ pub const SCHEMA: CommandSchema<'static> = {
         .build();
     const TIME_VALUE: ValueSchema<'static> =
         ValueSchemaBuilder::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]).build();
+    const DEPTH_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("DEPTH").required().build();
 
     const MODE_ARGUMENT: ArgumentSchema<'static> =
         ArgumentSchemaBuilder::new("mode", "Control how entry modes are shown").short('m').value(MODE_VALUE).build();
@@ -98,6 +100,8 @@ pub const SCHEMA: CommandSchema<'static> = {
         ArgumentSchemaBuilder::new("user", "Show all entry user names").build();
     const GROUP_ARGUMENT: ArgumentSchema<'static> =
         ArgumentSchemaBuilder::new("group", "Show all entry group names").build();
+    const DEPTH_ARGUMENT: ArgumentSchema<'static> =
+        ArgumentSchemaBuilder::new("depth", "Control how deep to traverse").short('d').value(DEPTH_VALUE).build();
 
     const LIST_COMMAND: CommandSchema<'static> =
         CommandSchemaBuilder::new("list", "List the contents of one or more directories")
@@ -131,6 +135,7 @@ pub const SCHEMA: CommandSchema<'static> = {
                 EXCLUDE_ARGUMENT,
                 RESOLVE_SYMLINKS_ARGUMENT,
                 SORT_ARGUMENT,
+                DEPTH_ARGUMENT,
             ])
             .build();
 
@@ -245,6 +250,9 @@ where
         }
         Short('e') | Long("exclude") if arguments.command.is_some() => self::parse_exclude(arguments, parser),
         Short('i') | Long("include") if arguments.command.is_some() => self::parse_include(arguments, parser),
+        Short('d') | Long("depth") if arguments.command.as_ref().is_some_and(SubCommand::is_tree) => {
+            self::parse_depth(arguments, parser)
+        }
         Positional(value) => self::parse_positional(arguments, value),
         _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
     }
@@ -434,7 +442,7 @@ where
     None
 }
 
-/// Parses the created and/or modified command-line argument.
+/// Parses the created, accessed, and/or modified command-line argument.
 fn parse_time<'p, I>(
     arguments: &mut Arguments,
     parser: &mut Parser<&'p str, I>,
@@ -540,6 +548,36 @@ where
         Some(SubCommand::List(arguments)) => arguments.included.get_or_insert_default().add(path),
         Some(SubCommand::Tree(arguments)) => arguments.included.get_or_insert_default().add(path),
     }
+
+    None
+}
+
+/// Parses the depth command-line argument.
+fn parse_depth<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
+where
+    I: Iterator<Item = &'p str>,
+{
+    let Some(choice) = (match parser.next_value() {
+        Ok(choice) => choice,
+        Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
+    }) else {
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing traversal depth"));
+    };
+
+    let Some(SubCommand::Tree(TreeArguments { max_depth, .. })) = arguments.command.as_mut() else { unreachable!() };
+
+    *max_depth = Some(match choice.parse() {
+        Ok(value) => value,
+        Err(error) => {
+            return Some(self::exit_and_print(ERROR_CLI_USAGE, match error.kind() {
+                IntErrorKind::Empty => "missing traversal depth",
+                IntErrorKind::Zero | IntErrorKind::InvalidDigit => "depth must be a non-zero positive integer",
+                IntErrorKind::PosOverflow => "depth is too large",
+                IntErrorKind::NegOverflow => "depth is too small",
+                _ => "invalid depth",
+            }));
+        }
+    });
 
     None
 }
