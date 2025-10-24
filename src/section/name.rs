@@ -41,6 +41,8 @@ impl NameSection {
     pub const DIR_SUFFIX: &[u8] = b"/";
     /// The suffix used for executable files.
     pub const EXE_SUFFIX: &[u8] = b"*";
+    /// The suffix used for symbolic links.
+    pub const SYMLINK_SUFFIX: &[u8] = b"@";
 
     /// Creates a new [`NameSection`].
     #[inline]
@@ -58,7 +60,9 @@ impl Section for NameSection {
     {
         let name = if self.trim_paths { entry.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
 
-        if entry.is_dir() {
+        if entry.is_symlink() {
+            writev!(f, [name.as_encoded_bytes(), Self::SYMLINK_SUFFIX])?;
+        } else if entry.is_dir() {
             writev!(f, [name.as_encoded_bytes(), Self::DIR_SUFFIX])?;
         } else if entry.is_file() && entry.is_executable() {
             writev!(f, [name.as_encoded_bytes(), Self::EXE_SUFFIX])?;
@@ -79,6 +83,8 @@ impl Section for NameSection {
 
         if entry.is_symlink() {
             if entry.is_hidden() { writev!(f, [name] in Cyan) } else { writev!(f, [name] in BrightCyan) }?;
+
+            writev!(f, [Self::SYMLINK_SUFFIX] in White)?;
 
             if self.resolve_symlinks { SymlinkSection.write_color(f, parents, entry) } else { Ok(()) }
         } else if entry.is_dir() {
