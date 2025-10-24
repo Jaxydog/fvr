@@ -58,7 +58,10 @@ impl Section for NameSection {
         W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
-        let name = if self.trim_paths { entry.file_name() } else { None }.unwrap_or(entry.path.as_os_str());
+        let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
+            // This is so that the directory suffix is only ever written once.
+            entry.path.trim_trailing_sep().as_os_str()
+        });
 
         if entry.is_symlink() {
             writev!(f, [name.as_encoded_bytes(), Self::SYMLINK_SUFFIX])?;
@@ -78,7 +81,10 @@ impl Section for NameSection {
         W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
-        let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or(entry.path.as_os_str());
+        let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
+            // This is so that the directory suffix is only ever written once.
+            entry.path.trim_trailing_sep().as_os_str()
+        });
         let name = name.as_encoded_bytes();
 
         if entry.is_symlink() {
