@@ -65,7 +65,7 @@ impl Section for NameSection {
 
         if entry.is_symlink() {
             writev!(f, [name.as_encoded_bytes(), Self::SYMLINK_SUFFIX])?;
-        } else if entry.is_dir() {
+        } else if entry.is_dir() && !name.as_encoded_bytes().eq_ignore_ascii_case(b"/") {
             writev!(f, [name.as_encoded_bytes(), Self::DIR_SUFFIX])?;
         } else if entry.is_file() && entry.is_executable() {
             writev!(f, [name.as_encoded_bytes(), Self::EXE_SUFFIX])?;
@@ -94,7 +94,9 @@ impl Section for NameSection {
 
             if self.resolve_symlinks { SymlinkSection.write_color(f, parents, entry) } else { Ok(()) }
         } else if entry.is_dir() {
-            if entry.is_hidden() { writev!(f, [name] in Blue) } else { writev!(f, [name] in BrightBlue) }?;
+            if !name.eq_ignore_ascii_case(b"/") {
+                if entry.is_hidden() { writev!(f, [name] in Blue) } else { writev!(f, [name] in BrightBlue) }?;
+            }
 
             writev!(f, [Self::DIR_SUFFIX] in White)
         } else if entry.is_executable() {
