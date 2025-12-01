@@ -129,14 +129,22 @@ impl Section for SymlinkSection {
         F: Filter<(PathBuf, Metadata)>,
     {
         let resolved = std::fs::read_link(entry.path)?;
+        let (target_exists, data) = if resolved.is_relative()
+            && let Some(parent) = parents.last().map(|entry| entry.path)
+        {
+            let path = parent.join(&resolved);
 
-        if resolved.try_exists()? {
+            (path.try_exists()?, std::fs::symlink_metadata(&path).ok())
+        } else {
+            (resolved.try_exists()?, std::fs::symlink_metadata(&resolved).ok())
+        };
+
+        if target_exists {
             writev!(f, [b" ", Self::LINKED_ARROW, b" "])?;
         } else {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "])?;
         }
 
-        let data = std::fs::symlink_metadata(&resolved).ok();
         let path = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
         let entry = Entry::root(path.as_ref(), data.as_ref(), entry.filter);
 
@@ -149,14 +157,22 @@ impl Section for SymlinkSection {
         F: Filter<(PathBuf, Metadata)>,
     {
         let resolved = std::fs::read_link(entry.path)?;
+        let (target_exists, data) = if resolved.is_relative()
+            && let Some(parent) = parents.last().map(|entry| entry.path)
+        {
+            let path = parent.join(&resolved);
 
-        if resolved.try_exists()? {
+            (path.try_exists()?, std::fs::symlink_metadata(&path).ok())
+        } else {
+            (resolved.try_exists()?, std::fs::symlink_metadata(&resolved).ok())
+        };
+
+        if target_exists {
             writev!(f, [b" ", Self::LINKED_ARROW, b" "] in White)?;
         } else {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "] in BrightRed)?;
         }
 
-        let data = std::fs::symlink_metadata(&resolved).ok();
         let path = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
         let entry = Entry::root(path.as_ref(), data.as_ref(), entry.filter);
 
