@@ -192,7 +192,7 @@ pub struct CommandSchema<'s> {
     /// The command's positional arguments.
     pub positionals: Option<&'s [ValueSchema<'s>]>,
     /// The command's sub-commands.
-    pub commands: Option<&'s [CommandSchema<'s>]>,
+    pub commands: Option<&'s [Self]>,
 }
 
 impl CommandSchema<'_> {
