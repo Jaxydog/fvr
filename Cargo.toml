@@ -34,6 +34,7 @@ lto = "fat"
 strip = "symbols"
 
 [dependencies]
+carp = { git = "https://github.com/Jaxydog/carp" }
 itoa = "~1.0"
 mimalloc = { version = "~0.1", features = ["v3"] }
 owo-colors = "~4.2"

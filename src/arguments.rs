@@ -20,11 +20,12 @@ use std::fmt::Display;
 use std::num::IntErrorKind;
 use std::path::Path;
 
+use carp::{ArgumentOrPositional, Parser};
+
 use self::model::{
     Arguments, ColorChoice, ListArguments, ModeVisibility, SizeVisibility, SortOrder, SubCommand, TimeVisibility,
     TreeArguments,
 };
-use self::parse::{Argument, Parser};
 use crate::arguments::schema::{
     ArgumentSchema, ArgumentSchemaBuilder, CommandSchema, CommandSchemaBuilder, ValueSchema, ValueSchemaBuilder,
 };
@@ -32,7 +33,6 @@ use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 use crate::section::time::TimeSectionType;
 
 pub mod model;
-pub mod parse;
 pub mod schema;
 
 /// Defines the command's schema.
@@ -183,11 +183,11 @@ pub fn parse_arguments() -> ParseResult {
     let mut parser = Parser::new(arguments.iter().map(String::as_str));
     let mut arguments = Arguments::default();
 
-    while let Some(result) = parser.next_argument().transpose() {
-        if let Some(output) = match result {
-            Ok(argument) => self::parse_argument(&mut arguments, &mut parser, argument),
-            Err(error) => return self::exit_and_print(ERROR_GENERIC, error),
-        } {
+    while let Some(argument_or_positional) = match parser.parse_next() {
+        Ok(argument_or_positional) => argument_or_positional,
+        Err(error) => return self::exit_and_print(ERROR_CLI_USAGE, error),
+    } {
+        if let Some(output) = self::parse_argument(&mut arguments, &mut parser, argument_or_positional) {
             return output;
         }
     }
@@ -213,48 +213,51 @@ pub fn parse_arguments() -> ParseResult {
 fn parse_argument<'p, I>(
     arguments: &mut Arguments,
     parser: &mut Parser<&'p str, I>,
-    argument: Argument<&'p str>,
+    argument: ArgumentOrPositional<&'p str>,
 ) -> Option<ParseResult>
 where
     I: Iterator<Item = &'p str>,
 {
-    use self::parse::Argument::{Long, Positional, Short};
+    use carp::Argument::{Long, Short};
+    use carp::ArgumentOrPositional::{Argument, Positional};
 
     match argument {
-        Short('h') | Long("help") => Some(self::parse_help(arguments, parser)),
-        Short('V') | Long("version") if arguments.command.is_none() => Some(self::parse_version()),
-        Long("color") => self::parse_color(arguments, parser),
-        Short('a') | Long("all") if arguments.command.is_some() => self::parse_all(arguments),
-        Short('r') | Long("resolve-symlinks") if arguments.command.is_some() => self::parse_resolve_symlinks(arguments),
-        Long("sort") if arguments.command.is_some() => self::parse_sort(arguments, parser),
-        Short('m') | Long("mode") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Short('h') | Long("help")) => Some(self::parse_help(arguments, parser)),
+        Argument(Short('V') | Long("version")) if arguments.command.is_none() => Some(self::parse_version()),
+        Argument(Long("color")) => self::parse_color(arguments, parser),
+        Argument(Short('a') | Long("all")) if arguments.command.is_some() => self::parse_all(arguments),
+        Argument(Short('r') | Long("resolve-symlinks")) if arguments.command.is_some() => {
+            self::parse_resolve_symlinks(arguments)
+        }
+        Argument(Long("sort")) if arguments.command.is_some() => self::parse_sort(arguments, parser),
+        Argument(Short('m') | Long("mode")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_mode(arguments, parser)
         }
-        Short('s') | Long("size") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Short('s') | Long("size")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_size(arguments, parser)
         }
-        Long("created") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Long("created")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, TimeSectionType::Created)
         }
-        Long("accessed") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Long("accessed")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, TimeSectionType::Accessed)
         }
-        Long("modified") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Long("modified")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, TimeSectionType::Modified)
         }
-        Short('u') | Long("user") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Short('u') | Long("user")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_user(arguments)
         }
-        Short('g') | Long("group") if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
+        Argument(Short('g') | Long("group")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_group(arguments)
         }
-        Short('e') | Long("exclude") if arguments.command.is_some() => self::parse_exclude(arguments, parser),
-        Short('i') | Long("include") if arguments.command.is_some() => self::parse_include(arguments, parser),
-        Short('d') | Long("depth") if arguments.command.as_ref().is_some_and(SubCommand::is_tree) => {
+        Argument(Short('e') | Long("exclude")) if arguments.command.is_some() => self::parse_exclude(arguments, parser),
+        Argument(Short('i') | Long("include")) if arguments.command.is_some() => self::parse_include(arguments, parser),
+        Argument(Short('d') | Long("depth")) if arguments.command.as_ref().is_some_and(SubCommand::is_tree) => {
             self::parse_depth(arguments, parser)
         }
         Positional(value) => self::parse_positional(arguments, value),
-        _ => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
+        Argument(_) => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
     }
 }
 
@@ -283,7 +286,9 @@ fn parse_help<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>)
 where
     I: Iterator<Item = &'p str>,
 {
-    if let Ok(Some(value)) = arguments.command.is_none().then(|| parser.next_value()).transpose().map(Option::flatten) {
+    if let Ok(Some(value)) =
+        arguments.command.is_none().then(|| parser.parse_next_assigned_value()).transpose().map(Option::flatten)
+    {
         // Attempt to read the next argument as a sub-command.
         drop(self::parse_positional(arguments, value));
     }
@@ -304,7 +309,7 @@ fn parse_color<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(choice) = (match parser.next_value() {
+    let Some(choice) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -356,7 +361,7 @@ where
         unreachable!();
     };
 
-    let Some(orderings) = (match parser.next_value() {
+    let Some(orderings) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -398,7 +403,7 @@ fn parse_mode<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>)
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(choice) = (match parser.next_value() {
+    let Some(choice) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -422,7 +427,7 @@ fn parse_size<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>)
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(choice) = (match parser.next_value() {
+    let Some(choice) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -451,7 +456,7 @@ fn parse_time<'p, I>(
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(choice) = (match parser.next_value() {
+    let Some(choice) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -507,7 +512,7 @@ fn parse_exclude<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, 
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(path) = (match parser.next_value() {
+    let Some(path) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -532,7 +537,7 @@ fn parse_include<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, 
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(path) = (match parser.next_value() {
+    let Some(path) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
@@ -557,7 +562,7 @@ fn parse_depth<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(choice) = (match parser.next_value() {
+    let Some(choice) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
     }) else {
