@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "carp"
 version = "0.1.0"
-source = "git+https://github.com/Jaxydog/carp#9ef36c62a3f801777f40f2520656f0b95d7c5e09"
+source = "git+https://github.com/Jaxydog/carp#0bc73dc9bc5843d5787a5ee4974c81eddce91d48"
 
 [[package]]
 name = "cc"
