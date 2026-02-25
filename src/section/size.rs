@@ -232,7 +232,7 @@ impl Section for SizeSection {
             (scaled_size, unit.suffix, Self::PAD_BASE_10)
         };
 
-        let mut buffer = ryu::Buffer::new();
+        let mut buffer = zmij::Buffer::new();
         let bytes = buffer.format(scaled_size).as_bytes();
         let Some((whole, decimal)) = bytes.split_once(|b| *b == Self::CHAR_DECIMAL) else { unreachable!() };
         let decimal = &[Self::CHAR_DECIMAL, decimal[0], Self::CHAR_PADDING];
@@ -297,7 +297,7 @@ impl Section for SizeSection {
             (scaled_size, unit.suffix, Self::PAD_BASE_10)
         };
 
-        let mut buffer = ryu::Buffer::new();
+        let mut buffer = zmij::Buffer::new();
         let bytes = buffer.format(scaled_size).as_bytes();
         let Some((whole, decimal)) = bytes.split_once(|b| *b == Self::CHAR_DECIMAL) else { unreachable!() };
         let decimal = &[Self::CHAR_DECIMAL, decimal[0], Self::CHAR_PADDING];
