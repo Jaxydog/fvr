@@ -36,7 +36,6 @@ strip = "symbols"
 [dependencies]
 carp = { git = "https://github.com/Jaxydog/carp" }
 itoa = "~1.0"
-mimalloc = { version = "~0.1", features = ["v3"] }
 owo-colors = "~4.3"
 rapidhash = { version = "~4.4", features = ["nightly", "unsafe"] }
 recomposition = { version = "~0.1", git = "https://github.com/Jaxydog/recomposition" }
