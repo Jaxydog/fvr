@@ -17,7 +17,7 @@
 //! Implements sections related to entry owners.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::Metadata;
 use std::io::{Result, Write};
@@ -25,7 +25,6 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use rapidhash::RapidHashMap;
 use recomposition::filter::Filter;
 
 use super::Section;
@@ -47,7 +46,7 @@ impl UserSection {
     /// Returns the user name associated with the given user identifier.
     fn name(uid: u32) -> Option<Rc<OsStr>> {
         thread_local! {
-            static CACHE: RefCell<RapidHashMap<u32, Option<Rc<OsStr>>>> = RefCell::new(HashMap::default());
+            static CACHE: RefCell<BTreeMap<u32, Option<Rc<OsStr>>>> = RefCell::new(BTreeMap::default());
         }
 
         CACHE.with(|v| {
@@ -58,7 +57,7 @@ impl UserSection {
     /// Returns the maximum length that all user sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<RapidHashMap<Box<OsStr>, usize>> = RefCell::new(HashMap::default());
+            static CACHE: RefCell<BTreeMap<Box<OsStr>, usize>> = RefCell::new(BTreeMap::default());
         }
 
         CACHE.with(|cache| {
@@ -124,7 +123,7 @@ impl GroupSection {
     /// Returns the group name associated with the given group identifier.
     fn name(gid: u32) -> Option<Rc<OsStr>> {
         thread_local! {
-            static CACHE: RefCell<RapidHashMap<u32, Option<Rc<OsStr>>>> = RefCell::new(HashMap::default());
+            static CACHE: RefCell<BTreeMap<u32, Option<Rc<OsStr>>>> = RefCell::new(BTreeMap::default());
         }
 
         CACHE.with(|v| {
@@ -135,7 +134,7 @@ impl GroupSection {
     /// Returns the maximum length that all group sections in the given directory will take up.
     fn max_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<RapidHashMap<Box<OsStr>, usize>> = RefCell::new(HashMap::default());
+            static CACHE: RefCell<BTreeMap<Box<OsStr>, usize>> = RefCell::new(BTreeMap::default());
         }
 
         CACHE.with(|cache| {
