@@ -17,7 +17,7 @@
 //! Implements a section that provides branches for tree-based views.
 
 use std::fs::Metadata;
-use std::io::{Result, Write};
+use std::io::{Result, StdoutLock};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -58,9 +58,8 @@ impl TreeSection {
 }
 
 impl Section for TreeSection {
-    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let depth = parents.len();
@@ -91,9 +90,8 @@ impl Section for TreeSection {
         writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL])
     }
 
-    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let depth = parents.len();

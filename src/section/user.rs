@@ -20,7 +20,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::Metadata;
-use std::io::{Result, Write};
+use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -82,9 +82,8 @@ impl UserSection {
 }
 
 impl Section for UserSection {
-    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let length = Self::max_len(parents[parents.len() - 1].path);
@@ -98,9 +97,8 @@ impl Section for UserSection {
         writev!(f, [user.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let length = Self::max_len(parents[parents.len() - 1].path);
@@ -159,9 +157,8 @@ impl GroupSection {
 }
 
 impl Section for GroupSection {
-    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let length = Self::max_len(parents[parents.len() - 1].path);
@@ -175,9 +172,8 @@ impl Section for GroupSection {
         writev!(f, [group.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let length = Self::max_len(parents[parents.len() - 1].path);

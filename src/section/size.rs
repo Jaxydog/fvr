@@ -19,7 +19,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::Metadata;
-use std::io::{Result, Write};
+use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -181,9 +181,8 @@ impl SizeSection {
 }
 
 impl Section for SizeSection {
-    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         if entry.is_dir() {
@@ -242,9 +241,8 @@ impl Section for SizeSection {
         writev!(f, [padding, whole, decimal, suffix])
     }
 
-    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         if entry.is_dir() {

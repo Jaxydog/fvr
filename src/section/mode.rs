@@ -17,7 +17,7 @@
 //! Implements a section that displays an entry's file type and permissions.
 
 use std::fs::Metadata;
-use std::io::{Result, Write};
+use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -196,9 +196,8 @@ impl ModeSection {
 }
 
 impl Section for ModeSection {
-    fn write_plain<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
@@ -207,9 +206,8 @@ impl Section for ModeSection {
         writev!(f, [&[b'[', Self::get_type(mode)], if self.extended { &permissions } else { &permissions[3 ..] }, b"]"])
     }
 
-    fn write_color<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         writev!(f, [b"["] in White)?;

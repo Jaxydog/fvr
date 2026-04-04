@@ -17,7 +17,7 @@
 //! Implements sections related to entry timestamps.
 
 use std::fs::Metadata;
-use std::io::{Result, Write};
+use std::io::{Result, StdoutLock};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -102,9 +102,8 @@ impl TimeSection {
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for TimeSection {
-    fn write_plain<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let Some(timestamp) = entry.data.and_then(|v| match self.kind {
@@ -129,9 +128,8 @@ impl Section for TimeSection {
         writev!(f, [formatted.as_bytes()])
     }
 
-    fn write_color<W, F>(&self, f: &mut W, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let Some(timestamp) = entry.data.and_then(|v| match self.kind {

@@ -17,7 +17,7 @@
 //! Implements sections related to entry names.
 
 use std::fs::Metadata;
-use std::io::{Result, Write};
+use std::io::{Result, StdoutLock};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -53,9 +53,8 @@ impl NameSection {
 }
 
 impl Section for NameSection {
-    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
@@ -76,9 +75,8 @@ impl Section for NameSection {
         if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
     }
 
-    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
@@ -123,9 +121,8 @@ impl SymlinkSection {
 }
 
 impl Section for SymlinkSection {
-    fn write_plain<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let resolved = std::fs::read_link(entry.path)?;
@@ -151,9 +148,8 @@ impl Section for SymlinkSection {
         NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &Rc::new(entry))
     }
 
-    fn write_color<W, F>(&self, f: &mut W, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
     where
-        W: Write,
         F: Filter<(PathBuf, Metadata)>,
     {
         let resolved = std::fs::read_link(entry.path)?;
