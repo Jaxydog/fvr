@@ -16,15 +16,14 @@
 
 //! Implements a section that displays an entry's size.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Mutex;
 
-use rapidhash::RapidHashMap;
 use recomposition::filter::Filter;
 
 use super::Section;
@@ -156,26 +155,25 @@ impl SizeSection {
     }
 
     /// Returns the maximum length that all simple size sections in the given directory will take up.
+    #[expect(clippy::unwrap_used, reason = "lock must not be poisoned")]
     fn max_simple_len(parent: &Path) -> usize {
         thread_local! {
-            static CACHE: RefCell<RapidHashMap<Box<Path>, usize>> = RefCell::new(HashMap::default());
+            static CACHE: Mutex<HashMap<Box<Path>, usize>> = Mutex::new(HashMap::new());
         }
 
         CACHE.with(|cache| {
-            if let Some(len) = cache.borrow().get(parent).copied() {
-                return len;
-            }
-
-            let len = std::fs::read_dir(parent).ok().and_then(|v| {
-                v.map_while(|v| v.and_then(|v| v.metadata()).ok())
-                    .map(|v| itoa::Buffer::new().format(v.size()).len())
-                    .max()
-            });
-            let len = len.unwrap_or(Self::WIDTH_SIMPLE);
-
-            cache.borrow_mut().insert(Box::from(parent), len);
-
-            len
+            *cache.lock().unwrap().entry(Box::from(parent)).or_insert_with(|| {
+                std::fs::read_dir(parent)
+                    .ok()
+                    .and_then(|read_result| {
+                        read_result
+                            .map_while(|entry_result| entry_result.and_then(|entry| entry.metadata()).ok())
+                            .map(|entry_metadata| entry_metadata.len())
+                            .map(|length| if length == 0 { 0 } else { length.ilog10() + 1 } as usize)
+                            .max()
+                    })
+                    .unwrap_or(Self::WIDTH_SIMPLE)
+            })
         })
     }
 }
