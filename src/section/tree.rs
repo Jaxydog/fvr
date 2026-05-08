@@ -18,8 +18,7 @@
 
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::Path;
 
 use recomposition::filter::Filter;
 
@@ -58,9 +57,9 @@ impl TreeSection {
 }
 
 impl Section for TreeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         let depth = parents.len();
 
@@ -90,9 +89,9 @@ impl Section for TreeSection {
         writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL])
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         let depth = parents.len();
 

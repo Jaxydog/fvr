@@ -16,10 +16,11 @@
 
 //! Defines the command's argument data types.
 
+use std::collections::HashSet;
 use std::fs::Metadata;
 use std::num::NonZero;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use recomposition::sort::Sort;
 
@@ -144,7 +145,7 @@ impl SubCommand {
 #[expect(clippy::struct_excessive_bools, reason = "such is the nature of command-line flags")]
 pub struct ListArguments {
     /// The paths to list.
-    pub paths: Paths,
+    pub paths: Vec<Box<Path>>,
     /// Whether to show hidden files.
     pub show_hidden: bool,
     /// Whether to resolve symbolic links.
@@ -166,16 +167,16 @@ pub struct ListArguments {
     /// Whether to show owner groups.
     pub group: bool,
     /// The paths to exclude.
-    pub excluded: Option<Paths>,
+    pub excluded: Option<HashSet<Box<Path>>>,
     /// The paths to include.
-    pub included: Option<Paths>,
+    pub included: Option<HashSet<Box<Path>>>,
 }
 
 /// The program's command-line arguments for the tree sub-command.
 #[derive(Default)]
 pub struct TreeArguments {
     /// The paths to list.
-    pub paths: Paths,
+    pub paths: Vec<Box<Path>>,
     /// Whether to show hidden files.
     pub show_hidden: bool,
     /// Whether to resolve symbolic links.
@@ -183,56 +184,11 @@ pub struct TreeArguments {
     /// The preferred sorting function.
     pub sorting: Option<SortOrder>,
     /// The paths to exclude.
-    pub excluded: Option<Paths>,
+    pub excluded: Option<HashSet<Box<Path>>>,
     /// The paths to include.
-    pub included: Option<Paths>,
+    pub included: Option<HashSet<Box<Path>>>,
     /// The depth of the search.
     pub max_depth: Option<NonZero<usize>>,
-}
-
-/// The paths to list.
-#[repr(transparent)]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Paths {
-    /// The inner set of paths.
-    inner: Vec<Box<Path>>,
-}
-
-impl Paths {
-    /// Creates a new [`Paths`].
-    #[must_use]
-    pub const fn new() -> Self {
-        Self { inner: Vec::new() }
-    }
-
-    /// Returns `true` if this value contains the given path.
-    pub fn has(&self, path: impl AsRef<Path>) -> bool {
-        self.inner.iter().any(|p| &(**p) == path.as_ref())
-    }
-
-    /// Adds the given path to the list.
-    pub fn add(&mut self, path: Box<Path>) {
-        if !self.has(&path) {
-            self.inner.push(path);
-        }
-    }
-
-    /// Returns an iterator of the inner paths.
-    pub fn get(&self) -> impl Iterator<Item = &Path> {
-        self.inner.iter().map(|v| &(**v))
-    }
-
-    /// Returns the number of paths.
-    #[must_use]
-    pub const fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    /// Returns `true` if no paths have been added.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
 }
 
 /// Describes how entries should be sorted.
@@ -290,8 +246,8 @@ impl SortOrder {
     }
 }
 
-impl Sort<(PathBuf, Metadata)> for SortOrder {
-    fn compare(&self, lhs: &(PathBuf, Metadata), rhs: &(PathBuf, Metadata)) -> std::cmp::Ordering {
+impl Sort<(Box<Path>, Metadata)> for SortOrder {
+    fn compare(&self, lhs: &(Box<Path>, Metadata), rhs: &(Box<Path>, Metadata)) -> std::cmp::Ordering {
         use recomposition::sort::{order, partial_order};
 
         match self {

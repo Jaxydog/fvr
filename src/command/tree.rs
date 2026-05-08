@@ -16,9 +16,12 @@
 
 //! Implements the tree sub-command.
 
+use std::fs::Metadata;
 use std::io::Write;
 use std::num::NonZero;
-use std::rc::Rc;
+use std::path::Path;
+
+use recomposition::sort::ListSortExt;
 
 use crate::arguments::model::{Arguments, SubCommand};
 use crate::files::{Entry, is_hidden};
@@ -31,14 +34,14 @@ use crate::section::tree::TreeSection;
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
-    let Some(SubCommand::Tree(tree_arguments)) = arguments.command.as_ref() else { unreachable!() };
+pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
+    let Some(SubCommand::Tree(tree_arguments)) = arguments.command else { unreachable!() };
 
     let sort = tree_arguments.sorting.clone().unwrap_or_default();
     let filter = recomposition::filter::from_fn(|(path, _)| {
         (tree_arguments.show_hidden || !is_hidden(path))
-            && tree_arguments.included.as_ref().is_none_or(|include| include.has(path))
-            && !tree_arguments.excluded.as_ref().is_some_and(|exclude| exclude.has(path))
+            && tree_arguments.included.as_ref().is_none_or(|include| include.contains(path))
+            && !tree_arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
     });
 
     let tree_section = TreeSection::new(tree_arguments.max_depth.map_or(usize::MAX, NonZero::get));
@@ -46,16 +49,33 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
     let f = &mut std::io::stdout().lock();
 
-    for (index, path) in tree_arguments.paths.get().enumerate() {
-        let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::root(path, data.as_ref(), &filter));
+    let paths = tree_arguments.paths.into_iter().map(|path| {
+        let data = std::fs::symlink_metadata(&path)?;
+
+        Ok((path, data))
+    });
+
+    let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, Metadata)]>>>()?;
+
+    paths.sort_unstable_with(&sort);
+
+    for (index, (path, data)) in paths.into_iter().enumerate() {
+        let entry = Entry::root(path, Some(data), &filter);
 
         if index > 0 {
             f.write_all(b"\n")?;
         }
 
-        tree_section.write(arguments.color, f, &[], &entry)?;
-        name_section.write(arguments.color, f, &[], &entry)?;
+        if entry.can_traverse() {
+            tree_section.write(arguments.color, f, &[], &entry)?;
+            name_section.write(arguments.color, f, &[], &entry)?;
+        } else {
+            let path = entry.path.absolute()?.parent().map_or_else(|| Path::new("/").into(), Box::from);
+            let entry = Entry::root(path, None, &filter);
+
+            tree_section.write(arguments.color, f, &[], &entry)?;
+            name_section.write(arguments.color, f, &[], &entry)?;
+        }
 
         f.write_all(b"\n")?;
 
@@ -65,8 +85,8 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
             &filter,
             &sort,
             &mut |parents, entry| {
-                tree_section.write(arguments.color, f, parents, &entry)?;
-                name_section.write(arguments.color, f, parents, &entry)?;
+                tree_section.write(arguments.color, f, parents, entry)?;
+                name_section.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b"\n")
             },

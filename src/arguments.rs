@@ -18,7 +18,7 @@
 
 use std::fmt::Display;
 use std::num::IntErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use carp::{ArgumentOrPositional, Parser};
 
@@ -201,7 +201,7 @@ pub fn parse_arguments() -> ParseResult {
 
     if paths.is_empty() {
         match std::env::current_dir().and_then(|v| v.canonicalize()) {
-            Ok(path) => paths.add(path.into_boxed_path()),
+            Ok(path) => paths.push(path.into_boxed_path()),
             Err(error) => return self::exit_and_print(ERROR_GENERIC, error),
         }
     }
@@ -266,8 +266,12 @@ fn parse_positional(arguments: &mut Arguments, value: &str) -> Option<ParseResul
     if let Some(command) = arguments.command.as_mut() {
         let (SubCommand::List(ListArguments { paths, .. }) | SubCommand::Tree(TreeArguments { paths, .. })) = command;
 
-        match Path::new(value).canonicalize() {
-            Ok(path) => paths.add(path.into_boxed_path()),
+        match Path::new(value).canonicalize().map(PathBuf::into_boxed_path) {
+            Ok(path) => {
+                if !paths.contains(&path) {
+                    paths.push(path);
+                }
+            }
             Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
         }
     } else {
@@ -525,9 +529,9 @@ where
 
     match arguments.command.as_mut() {
         None => unreachable!(),
-        Some(SubCommand::List(arguments)) => arguments.excluded.get_or_insert_default().add(path),
-        Some(SubCommand::Tree(arguments)) => arguments.excluded.get_or_insert_default().add(path),
-    }
+        Some(SubCommand::List(arguments)) => arguments.excluded.get_or_insert_default().insert(path),
+        Some(SubCommand::Tree(arguments)) => arguments.excluded.get_or_insert_default().insert(path),
+    };
 
     None
 }
@@ -550,9 +554,9 @@ where
 
     match arguments.command.as_mut() {
         None => unreachable!(),
-        Some(SubCommand::List(arguments)) => arguments.included.get_or_insert_default().add(path),
-        Some(SubCommand::Tree(arguments)) => arguments.included.get_or_insert_default().add(path),
-    }
+        Some(SubCommand::List(arguments)) => arguments.included.get_or_insert_default().insert(path),
+        Some(SubCommand::Tree(arguments)) => arguments.included.get_or_insert_default().insert(path),
+    };
 
     None
 }

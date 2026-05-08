@@ -24,7 +24,6 @@ use std::num::NonZero;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
-use std::rc::Rc;
 
 use recomposition::filter::Filter;
 use recomposition::sort::{ListSortExt, Sort};
@@ -33,33 +32,44 @@ use recomposition::sort::{ListSortExt, Sort};
 #[derive(Clone, Debug)]
 pub struct Entry<'e, F>
 where
-    F: Filter<(PathBuf, Metadata)>,
+    F: Filter<(Box<Path>, Metadata)>,
 {
-    /// The entry's file path.
-    pub path: &'e Path,
+    /// The entry's filepath.
+    pub path: Box<Path>,
     /// The entry's metadata.
-    pub data: Option<&'e Metadata>,
+    pub data: Option<Metadata>,
     /// The entry's index in the current depth.
     pub index: usize,
     /// The total number of entries in the current depth.
     pub total: usize,
     /// The filter used to resolve entries.
     pub filter: &'e F,
-    /// Caches the entry's file name.
+    /// Caches the entry's filename.
     file_name_cache: OnceCell<Option<Box<OsStr>>>,
     /// Caches whether this entry has children.
     has_children_cache: OnceCell<bool>,
+    /// Caches whether this entry can be traversed like a directory.
+    can_traverse_cache: OnceCell<bool>,
 }
 
 impl<'e, F> Entry<'e, F>
 where
-    F: Filter<(PathBuf, Metadata)>,
+    F: Filter<(Box<Path>, Metadata)>,
 {
     /// Creates a new [`Entry`] using the given path and optional data.
     #[inline]
     #[must_use]
-    pub const fn new(path: &'e Path, data: Option<&'e Metadata>, index: usize, total: usize, filter: &'e F) -> Self {
-        Self { path, data, index, total, filter, file_name_cache: OnceCell::new(), has_children_cache: OnceCell::new() }
+    pub const fn new(path: Box<Path>, data: Option<Metadata>, index: usize, total: usize, filter: &'e F) -> Self {
+        Self {
+            path,
+            data,
+            index,
+            total,
+            filter,
+            file_name_cache: OnceCell::new(),
+            has_children_cache: OnceCell::new(),
+            can_traverse_cache: OnceCell::new(),
+        }
     }
 
     /// Creates a new [`Entry`] using the given path and optional data.
@@ -67,7 +77,7 @@ where
     /// This entry will have an index of 0, a total count of 1.
     #[inline]
     #[must_use]
-    pub const fn root(path: &'e Path, data: Option<&'e Metadata>, filter: &'e F) -> Self {
+    pub const fn root(path: Box<Path>, data: Option<Metadata>, filter: &'e F) -> Self {
         Self::new(path, data, 0, 1, filter)
     }
 
@@ -95,19 +105,19 @@ where
     /// Returns `true` if this entry represents a directory.
     #[inline]
     pub fn is_dir(&self) -> bool {
-        self.data.map_or_else(|| self.path.is_dir(), Metadata::is_dir)
+        self.data.as_ref().map_or_else(|| self.path.is_dir(), Metadata::is_dir)
     }
 
     /// Returns `true` if this entry represents a file.
     #[inline]
     pub fn is_file(&self) -> bool {
-        self.data.map_or_else(|| self.path.is_file(), Metadata::is_file)
+        self.data.as_ref().map_or_else(|| self.path.is_file(), Metadata::is_file)
     }
 
     /// Returns `true` if this entry represents a symbolic link.
     #[inline]
     pub fn is_symlink(&self) -> bool {
-        self.data.map_or_else(|| self.path.is_symlink(), Metadata::is_symlink)
+        self.data.as_ref().map_or_else(|| self.path.is_symlink(), Metadata::is_symlink)
     }
 
     /// Returns `true` if this entry has an executable flag set.
@@ -116,21 +126,29 @@ where
     pub fn is_executable(&self) -> bool {
         use crate::section::mode::permissions::{EXECUTE, MASK, test};
 
-        self.data.is_some_and(|v| test::<MASK, EXECUTE>(v.mode()))
+        self.data.as_ref().is_some_and(|v| test::<MASK, EXECUTE>(v.mode()))
     }
 
-    /// Returns `true` if this entry is considered 'hidden' based off its file name.
+    /// Returns `true` if this entry is considered 'hidden' based off its filename.
     #[inline]
     #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.file_name().and_then(|v| v.as_bytes().first()).copied().is_some_and(|v| v == b'.')
     }
 
-    /// Returns the file name of this [`Entry`].
+    /// Returns the filename of this [`Entry`].
     #[inline]
     pub fn file_name(&self) -> Option<&OsStr> {
         // This call can be expensive, so we cache the result.
         self.file_name_cache.get_or_init(|| self.path.file_name().map(Box::from)).as_deref()
+    }
+
+    /// Returns `true` if this entry can be traversed like a directory.
+    #[must_use]
+    pub fn can_traverse(&self) -> bool {
+        *self.can_traverse_cache.get_or_init(|| {
+            self.is_dir() || (self.is_symlink() && std::fs::metadata(&self.path).is_ok_and(|data| data.is_dir()))
+        })
     }
 
     /// Returns `true` if this entry represents a directory and has one or more entries within it.
@@ -138,10 +156,14 @@ where
     pub fn has_children(&self) -> bool {
         *self.has_children_cache.get_or_init(|| {
             // This call can be very expensive and slow, so we cache the result.
-            self.is_dir()
-                && std::fs::read_dir(self.path).is_ok_and(|mut v| {
+            self.can_traverse()
+                && std::fs::read_dir(&self.path).is_ok_and(|mut v| {
                     // Search for at least one child that matches the filter.
-                    v.any(|v| v.as_ref().is_ok_and(|v| v.metadata().is_ok_and(|m| self.filter.test(&(v.path(), m)))))
+                    v.any(|v| {
+                        v.as_ref().is_ok_and(|v| {
+                            v.metadata().is_ok_and(|m| self.filter.test(&(v.path().into_boxed_path(), m)))
+                        })
+                    })
                 })
         })
     }
@@ -154,25 +176,29 @@ where
 /// # Errors
 ///
 /// This function will return an error if the entry's children could not be accessed or the closure fails.
-pub fn visit_entries<F, S, V>(entry: &Rc<Entry<F>>, filter: &F, sort: &S, mut visit: V) -> Result<()>
+pub fn visit_entries<F, S, V>(entry: &Entry<F>, filter: &F, sort: &S, mut visit: V) -> Result<()>
 where
-    F: Filter<(PathBuf, Metadata)>,
-    S: Sort<(PathBuf, Metadata)>,
-    V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
+    F: Filter<(Box<Path>, Metadata)>,
+    S: Sort<(Box<Path>, Metadata)>,
+    V: FnMut(&[&Entry<F>], &Entry<F>) -> Result<()>,
 {
-    let mut collection = std::fs::read_dir(entry.path)?
-        .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path(), d))))
+    if !entry.can_traverse() {
+        return visit(&[], entry);
+    }
+
+    let mut collection = std::fs::read_dir(&entry.path)?
+        .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path().into_boxed_path(), d))))
         .filter(|v| v.as_ref().map_or(true, |v| filter.test(v)))
-        .collect::<Result<Box<[(PathBuf, Metadata)]>>>()?;
+        .collect::<Result<Box<[(Box<Path>, Metadata)]>>>()?;
 
     collection.sort_unstable_with(sort);
 
     let total = collection.len();
 
-    collection.iter().enumerate().try_for_each(|(index, (path, data))| {
+    collection.into_iter().enumerate().try_for_each(|(index, (path, data))| {
         let child = Entry::new(path, Some(data), index, total, filter);
 
-        visit(&[entry], Rc::new(child))
+        visit(&[entry], &child)
     })
 }
 
@@ -184,23 +210,23 @@ where
 ///
 /// This function will return an error if an entry's children could not be accessed or the closure fails.
 pub fn visit_entries_recursive<F, S, V>(
-    entry: &Rc<Entry<F>>,
+    entry: &Entry<F>,
     max_depth: Option<NonZero<usize>>,
     filter: &F,
     sort: &S,
     visit: &mut V,
 ) -> Result<()>
 where
-    F: Filter<(PathBuf, Metadata)>,
-    S: Sort<(PathBuf, Metadata)>,
-    V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
+    F: Filter<(Box<Path>, Metadata)>,
+    S: Sort<(Box<Path>, Metadata)>,
+    V: FnMut(&[&Entry<F>], &Entry<F>) -> Result<()>,
 {
     #[inline]
-    fn inner<F, S, V>(entries: &[&Rc<Entry<F>>], max_depth: usize, filter: &F, sort: &S, visit: &mut V) -> Result<()>
+    fn inner<F, S, V>(entries: &[&Entry<F>], max_depth: usize, filter: &F, sort: &S, visit: &mut V) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
-        S: Sort<(PathBuf, Metadata)>,
-        V: FnMut(&[&Rc<Entry<F>>], Rc<Entry<F>>) -> Result<()>,
+        F: Filter<(Box<Path>, Metadata)>,
+        S: Sort<(Box<Path>, Metadata)>,
+        V: FnMut(&[&Entry<F>], &Entry<F>) -> Result<()>,
     {
         if max_depth == 0 {
             return Ok(());
@@ -209,13 +235,13 @@ where
         let Some(entry) = entries.last() else { unreachable!() };
 
         self::visit_entries(entry, filter, sort, |_, entry| {
-            visit(entries, Rc::clone(&entry))?;
+            visit(entries, entry)?;
 
             if entry.has_children() {
                 let mut new_entries = Vec::with_capacity(entries.len() + 1);
 
                 new_entries.extend_from_slice(entries);
-                new_entries.push(&entry);
+                new_entries.push(entry);
 
                 inner(&new_entries, max_depth.saturating_sub(1), filter, sort, visit)?;
             }

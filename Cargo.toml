@@ -34,7 +34,7 @@ lto = "fat"
 strip = "symbols"
 
 [dependencies]
-carp = { git = "https://github.com/Jaxydog/carp" }
+carp = { version = "~0.1", git = "https://github.com/Jaxydog/carp" }
 itoa = "~1.0"
 owo-colors = "~4.3"
 recomposition = { version = "~0.1", git = "https://github.com/Jaxydog/recomposition" }

@@ -25,7 +25,7 @@
 // General lints
 #![warn(clippy::cargo, clippy::nursery, clippy::pedantic, missing_docs)]
 // Feature gates
-#![feature(can_vector, path_trailing_sep, slice_split_once, write_all_vectored)]
+#![feature(can_vector, path_absolute_method, path_trailing_sep, slice_split_once, write_all_vectored)]
 
 use std::process::ExitCode;
 
@@ -59,8 +59,8 @@ fn main() -> ExitCode {
     };
 
     if let Err(error) = match &arguments.command {
-        Some(SubCommand::List(_)) => self::command::list::invoke(&arguments),
-        Some(SubCommand::Tree(_)) => self::command::tree::invoke(&arguments),
+        Some(SubCommand::List(_)) => self::command::list::invoke(arguments),
+        Some(SubCommand::Tree(_)) => self::command::tree::invoke(arguments),
         None => unreachable!("a sub-command should have been specified by now"),
     } {
         eprintln!("{error}");

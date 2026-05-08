@@ -20,8 +20,7 @@ use std::collections::HashMap;
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::path::Path;
 use std::sync::Mutex;
 
 use recomposition::filter::Filter;
@@ -179,17 +178,17 @@ impl SizeSection {
 }
 
 impl Section for SizeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         if entry.is_dir() {
+            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
+
             return match self.visibility {
                 SizeVisibility::Simple => {
-                    writev!(f, [&[Self::CHAR_BLANK], &vec![
-                        Self::CHAR_PADDING;
-                        Self::max_simple_len(parents[parents.len() - 1].path) - 1
-                    ]])
+                    writev!(f, [&[Self::CHAR_BLANK], &vec![Self::CHAR_PADDING; length - 1]])
                 }
                 SizeVisibility::Base2 => writev!(f, [
                     &[Self::CHAR_PADDING; 3],
@@ -206,13 +205,14 @@ impl Section for SizeSection {
             };
         }
 
-        let size = entry.data.map_or(0, MetadataExt::size);
+        let size = entry.data.as_ref().map_or(0, MetadataExt::size);
 
         if self.visibility.is_simple() {
             let mut buffer = itoa::Buffer::new();
             let bytes = buffer.format(size).as_bytes();
 
-            let length = Self::max_simple_len(parents[parents.len() - 1].path);
+            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
             let padding = vec![Self::CHAR_PADDING; length];
             let padding = &padding[.. length - bytes.len()];
 
@@ -239,17 +239,17 @@ impl Section for SizeSection {
         writev!(f, [padding, whole, decimal, suffix])
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         if entry.is_dir() {
+            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
+
             return match self.visibility {
                 SizeVisibility::Simple => {
-                    writev!(f, [&[Self::CHAR_BLANK], &vec![
-                        Self::CHAR_PADDING;
-                        Self::max_simple_len(parents[parents.len() - 1].path) - 1
-                    ]] in BrightBlack)
+                    writev!(f, [&[Self::CHAR_BLANK], &vec![Self::CHAR_PADDING; length - 1]] in BrightBlack)
                 }
                 SizeVisibility::Base2 => writev!(f, [
                     &[Self::CHAR_PADDING; 3],
@@ -266,13 +266,14 @@ impl Section for SizeSection {
             };
         }
 
-        let size = entry.data.map_or(0, MetadataExt::size);
+        let size = entry.data.as_ref().map_or(0, MetadataExt::size);
 
         if self.visibility.is_simple() {
             let mut buffer = itoa::Buffer::new();
             let bytes = buffer.format(size).as_bytes();
 
-            let length = Self::max_simple_len(parents[parents.len() - 1].path);
+            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
             let padding = vec![Self::CHAR_PADDING; length];
             let padding = &padding[.. length - bytes.len()];
 

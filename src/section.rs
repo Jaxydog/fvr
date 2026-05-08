@@ -18,8 +18,7 @@
 
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::Path;
 
 use recomposition::filter::Filter;
 
@@ -41,18 +40,18 @@ pub trait Section {
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>;
+        F: Filter<(Box<Path>, Metadata)>;
 
     /// Writes this section into the given writer using color.
     ///
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>;
+        F: Filter<(Box<Path>, Metadata)>;
 
     /// Writes this section into the given writer, determining whether to use color based on the given [`ColorChoice`].
     ///
@@ -63,11 +62,11 @@ pub trait Section {
         &self,
         color: ColorChoice,
         f: &mut StdoutLock<'_>,
-        parents: &[&Rc<Entry<F>>],
-        entry: &Rc<Entry<F>>,
+        parents: &[&Entry<F>],
+        entry: &Entry<F>,
     ) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         use supports_color::{Stream, on_cached};
 

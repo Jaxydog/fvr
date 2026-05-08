@@ -18,8 +18,7 @@
 
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::Path;
 
 use recomposition::filter::Filter;
 use time::format_description::BorrowedFormatItem;
@@ -102,11 +101,11 @@ impl TimeSection {
 
 #[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for TimeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let Some(timestamp) = entry.data.and_then(|v| match self.kind {
+        let Some(timestamp) = entry.data.as_ref().and_then(|v| match self.kind {
             TimeSectionType::Created => v.created().ok(),
             TimeSectionType::Accessed => v.accessed().ok(),
             TimeSectionType::Modified => v.modified().ok(),
@@ -128,11 +127,11 @@ impl Section for TimeSection {
         writev!(f, [formatted.as_bytes()])
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let Some(timestamp) = entry.data.and_then(|v| match self.kind {
+        let Some(timestamp) = entry.data.as_ref().and_then(|v| match self.kind {
             TimeSectionType::Created => v.created().ok(),
             TimeSectionType::Accessed => v.accessed().ok(),
             TimeSectionType::Modified => v.modified().ok(),

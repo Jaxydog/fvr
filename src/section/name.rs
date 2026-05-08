@@ -18,8 +18,7 @@
 
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::Path;
 
 use recomposition::filter::Filter;
 
@@ -53,9 +52,9 @@ impl NameSection {
 }
 
 impl Section for NameSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
@@ -75,9 +74,9 @@ impl Section for NameSection {
         if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
@@ -121,13 +120,13 @@ impl SymlinkSection {
 }
 
 impl Section for SymlinkSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let resolved = std::fs::read_link(entry.path)?;
+        let resolved = std::fs::read_link(&entry.path)?;
         let (target_exists, data) = if resolved.is_relative()
-            && let Some(parent) = parents.last().map(|entry| entry.path)
+            && let Some(parent) = parents.last().map(|entry| &entry.path)
         {
             let path = parent.join(&resolved);
 
@@ -142,19 +141,19 @@ impl Section for SymlinkSection {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "])?;
         }
 
-        let path = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
-        let entry = Entry::root(path.as_ref(), data.as_ref(), entry.filter);
+        let path = crate::files::relativize(&entry.path, &resolved).unwrap_or(resolved);
+        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
-        NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &Rc::new(entry))
+        NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry)
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let resolved = std::fs::read_link(entry.path)?;
+        let resolved = std::fs::read_link(&entry.path)?;
         let (target_exists, data) = if resolved.is_relative()
-            && let Some(parent) = parents.last().map(|entry| entry.path)
+            && let Some(parent) = parents.last().map(|entry| &entry.path)
         {
             let path = parent.join(&resolved);
 
@@ -169,9 +168,9 @@ impl Section for SymlinkSection {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "] in BrightRed)?;
         }
 
-        let path = crate::files::relativize(entry.path, &resolved).unwrap_or(resolved);
-        let entry = Entry::root(path.as_ref(), data.as_ref(), entry.filter);
+        let path = crate::files::relativize(&entry.path, &resolved).unwrap_or(resolved);
+        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
-        NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &Rc::new(entry))
+        NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry)
     }
 }

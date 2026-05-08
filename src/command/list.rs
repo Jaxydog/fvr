@@ -16,8 +16,11 @@
 
 //! Implements the list sub-command.
 
+use std::fs::Metadata;
 use std::io::Write;
-use std::rc::Rc;
+use std::path::Path;
+
+use recomposition::sort::ListSortExt;
 
 use crate::arguments::model::{Arguments, SubCommand};
 use crate::files::{Entry, is_hidden};
@@ -33,14 +36,14 @@ use crate::section::user::{GroupSection, UserSection};
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
-    let Some(SubCommand::List(list_arguments)) = arguments.command.as_ref() else { unreachable!() };
+pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
+    let Some(SubCommand::List(list_arguments)) = arguments.command else { unreachable!() };
 
     let sort = list_arguments.sorting.clone().unwrap_or_default();
-    let filter = recomposition::filter::from_fn(|(path, _)| {
+    let filter = recomposition::filter::from_fn(|(path, _): &(Box<Path>, _)| {
         (list_arguments.show_hidden || !is_hidden(path))
-            && list_arguments.included.as_ref().is_none_or(|include| include.has(path))
-            && !list_arguments.excluded.as_ref().is_some_and(|exclude| exclude.has(path))
+            && list_arguments.included.as_ref().is_none_or(|include| include.contains(path))
+            && !list_arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
     });
 
     let mode_section = if list_arguments.mode.is_hide() {
@@ -74,58 +77,73 @@ pub fn invoke(arguments: &Arguments) -> std::io::Result<()> {
 
     let f = &mut std::io::stdout().lock();
 
-    for (index, path) in list_arguments.paths.get().enumerate() {
-        let data = std::fs::symlink_metadata(path).ok();
-        let entry = Rc::new(Entry::new(path, data.as_ref(), index, list_arguments.paths.len(), &filter));
+    let total_paths = list_arguments.paths.len();
+    let paths = list_arguments.paths.into_iter().map(|path| {
+        let data = std::fs::symlink_metadata(&path)?;
 
-        if list_arguments.paths.len() > 1 {
-            if index > 0 {
-                f.write_all(b"\n")?;
+        Ok((path, data))
+    });
+
+    let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, Metadata)]>>>()?;
+
+    paths.sort_unstable_with(&sort);
+
+    for (index, (path, data)) in paths.into_iter().enumerate() {
+        let entry = Entry::new(path, Some(data), index, total_paths, &filter);
+
+        if index > 0 {
+            f.write_all(b"\n")?;
+        }
+        if total_paths > 1 {
+            if entry.can_traverse() {
+                name_section.write(arguments.color, f, &[], &entry)?;
+            } else {
+                let path = entry.path.absolute()?.parent().map_or_else(|| Path::new("/").into(), Box::from);
+
+                name_section.write(arguments.color, f, &[], &Entry::root(path, None, &filter))?;
             }
-
-            name_section.write(arguments.color, f, &[], &entry)?;
 
             f.write_all(b":\n")?;
         }
 
         crate::files::visit_entries(&entry, &filter, &sort, |parents, entry| {
             if let Some(mode) = &mode_section {
-                mode.write(arguments.color, f, parents, &entry)?;
+                mode.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(size) = &size_section {
-                size.write(arguments.color, f, parents, &entry)?;
+                size.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(created) = &created_section {
-                created.write(arguments.color, f, parents, &entry)?;
+                created.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(accessed) = &accessed_section {
-                accessed.write(arguments.color, f, parents, &entry)?;
+                accessed.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(modified) = &modified_section {
-                modified.write(arguments.color, f, parents, &entry)?;
+                modified.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(user) = &user_section {
-                user.write(arguments.color, f, parents, &entry)?;
+                user.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(group) = &group_section {
-                group.write(arguments.color, f, parents, &entry)?;
+                group.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            name_section.write(arguments.color, f, parents, &entry)?;
+            name_section.write(arguments.color, f, parents, entry)?;
 
             f.write_all(b"\n")
         })?;

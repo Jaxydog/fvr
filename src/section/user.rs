@@ -22,7 +22,7 @@ use std::ffi::OsStr;
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
 
 use recomposition::filter::Filter;
@@ -43,7 +43,7 @@ pub const MAX_LEN: usize = 32;
 pub struct UserSection;
 
 impl UserSection {
-    /// Returns the user name associated with the given user identifier.
+    /// Returns the username associated with the given user identifier.
     fn name(uid: u32) -> Option<Rc<OsStr>> {
         thread_local! {
             static CACHE: RefCell<BTreeMap<u32, Option<Rc<OsStr>>>> = RefCell::new(BTreeMap::default());
@@ -82,13 +82,14 @@ impl UserSection {
 }
 
 impl Section for UserSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let length = Self::max_len(parents[parents.len() - 1].path);
+        let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+        let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
+        let Some(user) = entry.data.as_ref().and_then(|v| Self::name(v.uid())) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -97,13 +98,14 @@ impl Section for UserSection {
         writev!(f, [user.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let length = Self::max_len(parents[parents.len() - 1].path);
+        let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+        let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(user) = entry.data.and_then(|v| Self::name(v.uid())) else {
+        let Some(user) = entry.data.as_ref().and_then(|v| Self::name(v.uid())) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -157,13 +159,14 @@ impl GroupSection {
 }
 
 impl Section for GroupSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let length = Self::max_len(parents[parents.len() - 1].path);
+        let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+        let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(group) = entry.data.and_then(|v| Self::name(v.gid())) else {
+        let Some(group) = entry.data.as_ref().and_then(|v| Self::name(v.gid())) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -172,13 +175,14 @@ impl Section for GroupSection {
         writev!(f, [group.as_encoded_bytes(), &padding])
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let length = Self::max_len(parents[parents.len() - 1].path);
+        let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+        let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(group) = entry.data.and_then(|v| Self::name(v.gid())) else {
+        let Some(group) = entry.data.as_ref().and_then(|v| Self::name(v.gid())) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 

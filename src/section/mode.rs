@@ -19,8 +19,7 @@
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::Path;
 
 use recomposition::filter::Filter;
 
@@ -196,23 +195,23 @@ impl ModeSection {
 }
 
 impl Section for ModeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
-        let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
+        let mode = entry.data.as_ref().map(MetadataExt::mode).unwrap_or_default();
         let permissions = Self::get_permissions(mode);
 
         writev!(f, [&[b'[', Self::get_type(mode)], if self.extended { &permissions } else { &permissions[3 ..] }, b"]"])
     }
 
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Rc<Entry<F>>], entry: &Rc<Entry<F>>) -> Result<()>
+    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(PathBuf, Metadata)>,
+        F: Filter<(Box<Path>, Metadata)>,
     {
         writev!(f, [b"["] in White)?;
 
-        let mode = entry.data.map(MetadataExt::mode).unwrap_or_default();
+        let mode = entry.data.as_ref().map(MetadataExt::mode).unwrap_or_default();
 
         match Self::get_type(mode) {
             v @ Self::TYPE_DIRECTORY => writev!(f, [&[v]] in BrightBlue)?,
