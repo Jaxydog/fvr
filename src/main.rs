@@ -25,7 +25,7 @@
 // General lints
 #![warn(clippy::cargo, clippy::nursery, clippy::pedantic, missing_docs)]
 // Feature gates
-#![feature(can_vector, path_absolute_method, path_trailing_sep, slice_split_once, write_all_vectored)]
+#![feature(can_vector, io_error_more, path_absolute_method, path_trailing_sep, slice_split_once, write_all_vectored)]
 
 use std::process::ExitCode;
 

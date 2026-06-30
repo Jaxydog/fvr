@@ -16,8 +16,9 @@
 
 //! Implements sections related to entry names.
 
+use std::borrow::Cow;
 use std::fs::Metadata;
-use std::io::{Result, StdoutLock};
+use std::io::{ErrorKind, Result, StdoutLock};
 use std::path::Path;
 
 use recomposition::filter::Filter;
@@ -114,9 +115,11 @@ pub struct SymlinkSection;
 
 impl SymlinkSection {
     /// The arrow used when a symbolic link is broken.
-    pub const BROKEN_ARROW: &[u8] = b"~>";
+    pub const BROKEN_ARROW: &[u8] = b"-/>";
     /// The arrow used when a symbolic link is valid.
-    pub const LINKED_ARROW: &[u8] = b"->";
+    pub const LINKED_ARROW: &[u8] = b"-->";
+    /// The arrow used when a symbolic link is recursive.
+    pub const RECURSIVE_ARROW: &[u8] = b"<->";
 }
 
 impl Section for SymlinkSection {
@@ -124,24 +127,37 @@ impl Section for SymlinkSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let resolved = std::fs::read_link(&entry.path)?;
-        let (target_exists, data) = if resolved.is_relative()
+        let link_path = std::fs::read_link(&entry.path)?;
+        let real_path = if link_path.is_relative()
             && let Some(parent) = parents.last().map(|entry| &entry.path)
         {
-            let path = parent.join(&resolved);
-
-            (path.try_exists()?, std::fs::symlink_metadata(&path).ok())
+            Cow::Owned(parent.join(&link_path))
         } else {
-            (resolved.try_exists()?, std::fs::symlink_metadata(&resolved).ok())
+            Cow::Borrowed(&link_path)
         };
 
-        if target_exists {
+        let data = match std::fs::metadata(real_path.as_ref()) {
+            Ok(data) => Some(data),
+            Err(error) if error.kind() == ErrorKind::NotFound => None,
+            Err(error) if error.kind() == ErrorKind::FilesystemLoop => {
+                writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "])?;
+
+                let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
+                let data = std::fs::symlink_metadata(real_path.as_ref()).ok();
+                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
+
+                return NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry);
+            }
+            Err(error) => return Err(error),
+        };
+
+        if data.is_some() {
             writev!(f, [b" ", Self::LINKED_ARROW, b" "])?;
         } else {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "])?;
         }
 
-        let path = crate::files::relativize(&entry.path, &resolved).unwrap_or(resolved);
+        let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
         let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry)
@@ -151,24 +167,37 @@ impl Section for SymlinkSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let resolved = std::fs::read_link(&entry.path)?;
-        let (target_exists, data) = if resolved.is_relative()
+        let link_path = std::fs::read_link(&entry.path)?;
+        let real_path = if link_path.is_relative()
             && let Some(parent) = parents.last().map(|entry| &entry.path)
         {
-            let path = parent.join(&resolved);
-
-            (path.try_exists()?, std::fs::symlink_metadata(&path).ok())
+            Cow::Owned(parent.join(&link_path))
         } else {
-            (resolved.try_exists()?, std::fs::symlink_metadata(&resolved).ok())
+            Cow::Borrowed(&link_path)
         };
 
-        if target_exists {
+        let data = match std::fs::metadata(real_path.as_ref()) {
+            Ok(data) => Some(data),
+            Err(error) if error.kind() == ErrorKind::NotFound => None,
+            Err(error) if error.kind() == ErrorKind::FilesystemLoop => {
+                writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "] in Cyan)?;
+
+                let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
+                let data = std::fs::symlink_metadata(real_path.as_ref()).ok();
+                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
+
+                return NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry);
+            }
+            Err(error) => return Err(error),
+        };
+
+        if data.is_some() {
             writev!(f, [b" ", Self::LINKED_ARROW, b" "] in White)?;
         } else {
             writev!(f, [b" ", Self::BROKEN_ARROW, b" "] in BrightRed)?;
         }
 
-        let path = crate::files::relativize(&entry.path, &resolved).unwrap_or(resolved);
+        let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
         let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry)
