@@ -145,15 +145,12 @@ where
     pub fn has_children(&self) -> bool {
         *self.has_children_cache.get_or_init(|| {
             // This call can be very expensive and slow, so we cache the result.
-            self.can_traverse()
-                && std::fs::read_dir(&self.path).is_ok_and(|mut v| {
-                    // Search for at least one child that matches the filter.
-                    v.any(|v| {
-                        v.as_ref().is_ok_and(|v| {
-                            v.metadata().is_ok_and(|m| self.filter.test(&(v.path().into_boxed_path(), m)))
-                        })
-                    })
+            std::fs::read_dir(&self.path).is_ok_and(|mut v| {
+                // Search for at least one child that matches the filter.
+                v.any(|v| {
+                    v.is_ok_and(|v| v.metadata().is_ok_and(|m| self.filter.test(&(v.path().into_boxed_path(), m))))
                 })
+            })
         })
     }
 }
