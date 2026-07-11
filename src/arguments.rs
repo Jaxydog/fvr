@@ -143,7 +143,7 @@ pub const SCHEMA: CommandSchema<'static> = {
         ValueSchemaBuilder::new("SUBCOMMAND").options(&[LIST_COMMAND.name, TREE_COMMAND.name]).build();
 
     const HELP_WITH_SUBCOMMAND_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("help", "Shows the command (or a sub-command)'s usage")
+        ArgumentSchemaBuilder::new("help", "Shows the command (or a subcommand)'s usage")
             .short('h')
             .value(SUBCOMMAND_VALUE)
             .build();
@@ -165,7 +165,7 @@ pub enum ParseResult {
     Exit(u8),
 }
 
-/// Return an exiting [`ParseResult`] and print the given value.
+/// Return a [`ParseResult::Exit`] and print the given value.
 #[inline]
 fn exit_and_print(code: u8, display: impl Display) -> ParseResult {
     if code == SUCCESS {
@@ -196,7 +196,7 @@ pub fn parse_arguments() -> ParseResult {
         SubCommand::List(arguments) => &mut arguments.paths,
         SubCommand::Tree(arguments) => &mut arguments.paths,
     }) else {
-        return self::exit_and_print(ERROR_CLI_USAGE, "no sub-command was provided");
+        return self::exit_and_print(ERROR_CLI_USAGE, "no subcommand was provided");
     };
 
     if paths.is_empty() {
@@ -278,7 +278,7 @@ fn parse_positional(arguments: &mut Arguments, value: &str) -> Option<ParseResul
         arguments.command = Some(match value {
             "list" => SubCommand::List(ListArguments::default()),
             "tree" => SubCommand::Tree(TreeArguments::default()),
-            _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unknown sub-command `{value}`"))),
+            _ => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unknown subcommand `{value}`"))),
         });
     }
 
@@ -293,7 +293,7 @@ where
     if let Ok(Some(value)) =
         arguments.command.is_none().then(|| parser.parse_next_assigned_value()).transpose().map(Option::flatten)
     {
-        // Attempt to read the next argument as a sub-command.
+        // Attempt to read the next argument as a subcommand.
         drop(self::parse_positional(arguments, value));
     }
 

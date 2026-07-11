@@ -31,7 +31,7 @@ use crate::arguments::schema::CommandSchema;
 pub struct Arguments {
     /// Determines whether to output using color.
     pub color: ColorChoice,
-    /// The program's selected sub-command.
+    /// The program's selected subcommand.
     pub command: Option<SubCommand>,
 }
 
@@ -41,13 +41,13 @@ impl Arguments {
     /// # Panics
     ///
     /// Panics if the current schema has not been defined.
-    #[expect(clippy::expect_used, reason = "we cannot return a schema for a sub-command if it has not been defined")]
+    #[expect(clippy::expect_used, reason = "we cannot return a schema for a subcommand if it has not been defined")]
     pub const fn current_schema(&self) -> CommandSchema<'static> {
         #[inline]
         const fn sub_schema(index: usize) -> CommandSchema<'static> {
-            let list = super::SCHEMA.commands.expect("no sub-commands have been defined");
+            let list = super::SCHEMA.commands.expect("no subcommands have been defined");
 
-            assert!(index < list.len(), "missing required sub-command definition");
+            assert!(index < list.len(), "missing required subcommand definition");
 
             list[index]
         }
@@ -98,16 +98,16 @@ impl ColorChoice {
     }
 }
 
-/// The program's sub-command.
+/// The program's subcommand.
 pub enum SubCommand {
-    /// The list sub-command.
+    /// The list subcommand.
     List(ListArguments),
-    /// The tree sub-command.
+    /// The tree subcommand.
     Tree(TreeArguments),
 }
 
 impl SubCommand {
-    /// Returns `true` if the sub-command is [`List`].
+    /// Returns `true` if the subcommand is [`List`].
     ///
     /// [`List`]: SubCommand::List
     #[must_use]
@@ -115,7 +115,7 @@ impl SubCommand {
         matches!(self, Self::List(..))
     }
 
-    /// Returns `true` if the sub-command is [`Tree`].
+    /// Returns `true` if the subcommand is [`Tree`].
     ///
     /// [`Tree`]: SubCommand::Tree
     #[must_use]
@@ -123,7 +123,7 @@ impl SubCommand {
         matches!(self, Self::Tree(..))
     }
 
-    /// Returns the inner value of this sub-command if it is a [`List`].
+    /// Returns the inner value of this subcommand if it is a [`List`].
     ///
     /// [`List`]: SubCommand::List
     #[must_use]
@@ -131,7 +131,7 @@ impl SubCommand {
         if let Self::List(v) = self { Some(v) } else { None }
     }
 
-    /// Returns the inner value of this sub-command if it is a [`Tree`].
+    /// Returns the inner value of this subcommand if it is a [`Tree`].
     ///
     /// [`Tree`]: SubCommand::Tree
     #[must_use]
@@ -140,7 +140,7 @@ impl SubCommand {
     }
 }
 
-/// The program's command-line arguments for the list sub-command.
+/// The program's command-line arguments for the list subcommand.
 #[derive(Default)]
 #[expect(clippy::struct_excessive_bools, reason = "such is the nature of command-line flags")]
 pub struct ListArguments {
@@ -172,7 +172,7 @@ pub struct ListArguments {
     pub included: Option<HashSet<Box<Path>>>,
 }
 
-/// The program's command-line arguments for the tree sub-command.
+/// The program's command-line arguments for the tree subcommand.
 #[derive(Default)]
 pub struct TreeArguments {
     /// The paths to list.
@@ -272,7 +272,7 @@ impl Default for SortOrder {
     }
 }
 
-/// Determines whether to display an entry's Unix file mode.
+/// Determines whether to display an entry's UNIX file mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ModeVisibility {
     /// Do not show entry modes.

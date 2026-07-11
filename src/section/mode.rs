@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with fvr. If not,
 // see <https://www.gnu.org/licenses/>.
 
-//! Implements a section that displays an entry's file type and permissions.
+//! Implements a section that displays an entry's filetype and permissions.
 
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
@@ -28,7 +28,7 @@ use crate::files::Entry;
 use crate::{color_bytes, writev};
 
 /// Defines constants related to file entry types.
-pub mod file_type {
+pub mod filetype {
     /// A bit mask that isolates an entry's type from its mode integer.
     pub const MASK: u32 = 0o170_000;
 
@@ -47,14 +47,14 @@ pub mod file_type {
     /// The bit pattern for a pipe.
     pub const FIFO_PIPE: u32 = 0o010_000;
 
-    /// Returns `true` if the given mode's file type is set to `BITS`.
+    /// Returns `true` if the given mode's filetype is set to `BITS`.
     #[inline]
     #[must_use]
     pub const fn test<const BITS: u32>(mode: u32) -> bool {
         (mode & self::MASK) == BITS
     }
 
-    /// Returns the `set` value if the file type matches, otherwise returns `unset`.
+    /// Returns the `set` value if the filetype matches, otherwise returns `unset`.
     #[inline]
     pub const fn test_map<'t, T: ?Sized, const BITS: u32>(mode: u32, set: &'t T, unset: &'t T) -> &'t T {
         if self::test::<BITS>(mode) { set } else { unset }
@@ -105,7 +105,7 @@ pub mod permissions {
     }
 }
 
-/// A [`Section`] that writes an entry's file type and permissions.
+/// A [`Section`] that writes an entry's filetype and permissions.
 #[derive(Clone, Copy, Debug)]
 pub struct ModeSection {
     /// Whether to use an extended permission format.
@@ -141,7 +141,7 @@ impl ModeSection {
     pub const TYPE_SOCKET: u8 = b's';
     /// The byte used to represent a symbolic link.
     pub const TYPE_SYMBOLIC_LINK: u8 = b'l';
-    /// The byte used to represent an unknown file type.
+    /// The byte used to represent an unknown filetype.
     pub const TYPE_UNKNOWN: u8 = b'?';
 
     /// Creates a new [`ModeSection`].
@@ -151,12 +151,10 @@ impl ModeSection {
         Self { extended }
     }
 
-    /// Returns a series of bytes that represent the file type for the given mode.
+    /// Returns a series of bytes that represent the filetype for the given mode.
     #[must_use]
     pub const fn get_type(mode: u32) -> u8 {
-        use self::file_type::{
-            BLOCK_DEVICE, CHARACTER_DEVICE, DIRECTORY, FIFO_PIPE, FILE, MASK, SOCKET, SYMBOLIC_LINK,
-        };
+        use self::filetype::{BLOCK_DEVICE, CHARACTER_DEVICE, DIRECTORY, FIFO_PIPE, FILE, MASK, SOCKET, SYMBOLIC_LINK};
 
         match mode & MASK {
             FILE => Self::TYPE_FILE,

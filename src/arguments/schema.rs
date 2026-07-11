@@ -60,7 +60,7 @@ macro_rules! test_indexed {
 ///
 /// - Is composed entire of valid ASCII characters.
 /// - Is not bounded by excess whitespace characters.
-/// - Is non-empty.
+/// - Is nonempty.
 /// - Does not contain any control characters.
 ///
 /// # Panics
@@ -111,7 +111,7 @@ pub fn write_help(schema: CommandSchema<'_>, f: &mut impl Write) -> std::io::Res
     f.write_all(b"\n")?;
 
     if let Some(commands) = schema.commands {
-        f.write_all(b"\nSub-commands:\n")?;
+        f.write_all(b"\nSubcommands:\n")?;
 
         for CommandSchema { name, about, .. } in commands {
             writeln!(f, "  {name: <30} {about}")?;
@@ -191,7 +191,7 @@ pub struct CommandSchema<'s> {
     pub arguments: Option<&'s [ArgumentSchema<'s>]>,
     /// The command's positional arguments.
     pub positionals: Option<&'s [ValueSchema<'s>]>,
-    /// The command's sub-commands.
+    /// The command's subcommands.
     pub commands: Option<&'s [Self]>,
 }
 
@@ -250,7 +250,7 @@ impl CommandSchema<'_> {
             view_indexed!(commands, |index, command| {
                 _ = command.validate();
 
-                test_indexed!(commands, index + 1, "sub-commands should not contain duplicates", |_, other| {
+                test_indexed!(commands, index + 1, "subcommands should not contain duplicates", |_, other| {
                     !command.name.eq_ignore_ascii_case(other.name)
                 });
             });
@@ -294,7 +294,7 @@ impl<'s> CommandSchemaBuilder<'s> {
         self
     }
 
-    /// Sets the command's sub-commands.
+    /// Sets the command's subcommands.
     pub const fn commands(mut self, commands: &'s [CommandSchema<'s>]) -> Self {
         self.inner.commands = Some(commands);
 

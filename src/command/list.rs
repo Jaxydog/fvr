@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with fvr. If not,
 // see <https://www.gnu.org/licenses/>.
 
-//! Implements the list sub-command.
+//! Implements the list subcommand.
 
 use std::fs::Metadata;
 use std::io::Write;

@@ -36,7 +36,7 @@ pub mod arguments;
 pub mod files;
 pub mod section;
 
-/// Defines sub-command implementations.
+/// Defines subcommand implementations.
 pub mod command {
     pub mod list;
     pub mod tree;
@@ -61,7 +61,7 @@ fn main() -> ExitCode {
     if let Err(error) = match &arguments.command {
         Some(SubCommand::List(_)) => self::command::list::invoke(arguments),
         Some(SubCommand::Tree(_)) => self::command::tree::invoke(arguments),
-        None => unreachable!("a sub-command should have been specified by now"),
+        None => unreachable!("a subcommand should have been specified by now"),
     } {
         eprintln!("{error}");
 
