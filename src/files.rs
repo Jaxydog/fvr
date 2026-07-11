@@ -17,7 +17,6 @@
 //! Defines utilities for mapping out file tree structures.
 
 use std::cell::OnceCell;
-use std::ffi::OsStr;
 use std::fs::Metadata;
 use std::io::Result;
 use std::num::NonZero;
@@ -44,8 +43,6 @@ where
     pub total: usize,
     /// The filter used to resolve entries.
     pub filter: &'e F,
-    /// Caches the entry's filename.
-    file_name_cache: OnceCell<Option<Box<OsStr>>>,
     /// Caches whether this entry has children.
     has_children_cache: OnceCell<bool>,
     /// Caches whether this entry can be traversed like a directory.
@@ -66,7 +63,6 @@ where
             index,
             total,
             filter,
-            file_name_cache: OnceCell::new(),
             has_children_cache: OnceCell::new(),
             can_traverse_cache: OnceCell::new(),
         }
@@ -133,14 +129,7 @@ where
     #[inline]
     #[must_use]
     pub fn is_hidden(&self) -> bool {
-        self.file_name().and_then(|v| v.as_bytes().first()).copied().is_some_and(|v| v == b'.')
-    }
-
-    /// Returns the filename of this [`Entry`].
-    #[inline]
-    pub fn file_name(&self) -> Option<&OsStr> {
-        // This call can be expensive, so we cache the result.
-        self.file_name_cache.get_or_init(|| self.path.file_name().map(Box::from)).as_deref()
+        self.path.file_name().and_then(|v| v.as_bytes().first()).copied().is_some_and(|v| v == b'.')
     }
 
     /// Returns `true` if this entry can be traversed like a directory.

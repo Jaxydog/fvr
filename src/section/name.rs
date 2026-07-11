@@ -57,7 +57,7 @@ impl Section for NameSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
+        let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
             entry.path.trim_trailing_sep().as_os_str()
         });
@@ -79,7 +79,7 @@ impl Section for NameSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let name = (if self.trim_paths { entry.file_name() } else { None }).unwrap_or_else(|| {
+        let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
             entry.path.trim_trailing_sep().as_os_str()
         });
