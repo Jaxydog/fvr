@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2025 Jaxydog
+// Copyright © 2025–2026 Jaxydog
 //
 // This file is part of fvr.
 //
@@ -27,6 +27,34 @@ use std::path::{Component, Path, PathBuf};
 use recomposition::filter::Filter;
 use recomposition::sort::{ListSortExt, Sort};
 
+/// The bit pattern for a socket filetype.
+pub const FILETYPE_SOCKET: u32 = 0o140_000;
+/// The bit pattern for a symbolic link filetype.
+pub const FILETYPE_SYMBOLIC_LINK: u32 = 0o120_000;
+/// The bit pattern for a file filetype.
+pub const FILETYPE_FILE: u32 = 0o100_000;
+/// The bit pattern for a block device filetype.
+pub const FILETYPE_BLOCK_DEVICE: u32 = 0o060_000;
+/// The bit pattern for a directory filetype.
+pub const FILETYPE_DIRECTORY: u32 = 0o040_000;
+/// The bit pattern for a character device filetype.
+pub const FILETYPE_CHARACTER_DEVICE: u32 = 0o020_000;
+/// The bit pattern for a FIFO pipe filetype.
+pub const FILETYPE_FIFO_PIPE: u32 = 0o010_000;
+
+/// The bits set for read permissions.
+pub const PERMISSION_READ: u32 = 0o000_444;
+/// The bits set for write permissions.
+pub const PERMISSION_WRITE: u32 = 0o000_222;
+/// The bits set for execute permissions.
+pub const PERMISSION_EXECUTE: u32 = 0o000_111;
+/// The bits set for set-user-ID permissions.
+pub const PERMISSION_SET_UID: u32 = 0o004_000;
+/// The bits set for set-group-ID permissions.
+pub const PERMISSION_SET_GID: u32 = 0o002_000;
+/// The bits set for sticky permissions.
+pub const PERMISSION_STICKY: u32 = 0o001_000;
+
 /// An entry returned by a visit call.
 #[derive(Clone, Debug)]
 pub struct Entry<'e, F>
@@ -36,7 +64,7 @@ where
     /// The entry's filepath.
     pub path: Box<Path>,
     /// The entry's metadata.
-    pub data: Option<Metadata>,
+    pub data: Option<EntryMetadata>,
     /// The entry's index in the current depth.
     pub index: usize,
     /// The total number of entries in the current depth.
@@ -56,10 +84,10 @@ where
     /// Creates a new [`Entry`] using the given path and optional data.
     #[inline]
     #[must_use]
-    pub const fn new(path: Box<Path>, data: Option<Metadata>, index: usize, total: usize, filter: &'e F) -> Self {
+    pub fn new(path: Box<Path>, data: Option<&Metadata>, index: usize, total: usize, filter: &'e F) -> Self {
         Self {
             path,
-            data,
+            data: data.map(EntryMetadata::new),
             index,
             total,
             filter,
@@ -73,7 +101,7 @@ where
     /// This entry will have an index of 0, a total count of 1.
     #[inline]
     #[must_use]
-    pub const fn root(path: Box<Path>, data: Option<Metadata>, filter: &'e F) -> Self {
+    pub fn root(path: Box<Path>, data: Option<&Metadata>, filter: &'e F) -> Self {
         Self::new(path, data, 0, 1, filter)
     }
 
@@ -101,28 +129,26 @@ where
     /// Returns `true` if this entry represents a directory.
     #[inline]
     pub fn is_dir(&self) -> bool {
-        self.data.as_ref().map_or_else(|| self.path.is_dir(), Metadata::is_dir)
+        self.data.as_ref().map_or_else(|| self.path.is_dir(), |data| data.filetype().is_directory())
     }
 
     /// Returns `true` if this entry represents a file.
     #[inline]
     pub fn is_file(&self) -> bool {
-        self.data.as_ref().map_or_else(|| self.path.is_file(), Metadata::is_file)
+        self.data.as_ref().map_or_else(|| self.path.is_file(), |data| data.filetype().is_file())
     }
 
     /// Returns `true` if this entry represents a symbolic link.
     #[inline]
     pub fn is_symlink(&self) -> bool {
-        self.data.as_ref().map_or_else(|| self.path.is_symlink(), Metadata::is_symlink)
+        self.data.as_ref().map_or_else(|| self.path.is_symlink(), |data| data.filetype().is_symbolic_link())
     }
 
     /// Returns `true` if this entry has an executable flag set.
     #[inline]
     #[must_use]
     pub fn is_executable(&self) -> bool {
-        use crate::section::mode::permissions::{EXECUTE, MASK, test};
-
-        self.data.as_ref().is_some_and(|v| test::<MASK, EXECUTE>(v.mode()))
+        self.data.as_ref().is_some_and(|data| data.permissions().has(PERMISSION_EXECUTE))
     }
 
     /// Returns `true` if this entry is considered 'hidden' based off its filename.
@@ -155,6 +181,200 @@ where
     }
 }
 
+/// A lighter representation of an entry's filesystem metadata.
+#[derive(Clone, Copy, Debug)]
+pub struct EntryMetadata {
+    /// The entry's mode.
+    pub mode: u32,
+    /// The entry's size in bytes.
+    pub size: u64,
+    /// The creation time in seconds since the UNIX epoch.
+    pub ctime: i64,
+    /// The last access time in seconds since the UNIX epoch.
+    pub atime: i64,
+    /// The last modification time in seconds since the UNIX epoch.
+    pub mtime: i64,
+    /// The entry's user ID.
+    pub uid: u32,
+    /// The entry's group ID.
+    pub gid: u32,
+}
+
+impl EntryMetadata {
+    /// Creates a new [`EntryMetadata`] from the given [`Metadata`] reference.
+    #[must_use]
+    pub fn new(metadata: &Metadata) -> Self {
+        Self {
+            mode: metadata.mode(),
+            size: metadata.size(),
+            ctime: metadata.ctime(),
+            atime: metadata.atime(),
+            mtime: metadata.mtime(),
+            uid: metadata.uid(),
+            gid: metadata.gid(),
+        }
+    }
+
+    /// Returns the filetype of this [`EntryMetadata`].
+    #[must_use]
+    pub const fn filetype(&self) -> Filetype {
+        Filetype(self.mode)
+    }
+
+    /// Returns the permissions of this [`EntryMetadata`].
+    #[must_use]
+    pub const fn permissions(&self) -> Permissions {
+        Permissions(self.mode)
+    }
+}
+
+/// Provides getters for filetype values.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Filetype(pub(super) u32);
+
+impl Filetype {
+    /// Returns the bit pattern that represents the mode's filetype.
+    #[inline]
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0 & 0xF000
+    }
+
+    /// Returns whether the mode's filetype matches the expected value.
+    #[inline]
+    #[must_use]
+    pub const fn has(self, kind: u32) -> bool {
+        self.get() == kind
+    }
+
+    /// Returns whether this mode is a socket.
+    #[inline]
+    #[must_use]
+    pub const fn is_socket(self) -> bool {
+        self.has(self::FILETYPE_SOCKET)
+    }
+
+    /// Returns whether this mode is a symbolic link.
+    #[inline]
+    #[must_use]
+    pub const fn is_symbolic_link(self) -> bool {
+        self.has(self::FILETYPE_SYMBOLIC_LINK)
+    }
+
+    /// Returns whether this mode is a file.
+    #[inline]
+    #[must_use]
+    pub const fn is_file(self) -> bool {
+        self.has(self::FILETYPE_FILE)
+    }
+
+    /// Returns whether this mode is a block device.
+    #[inline]
+    #[must_use]
+    pub const fn is_block_device(self) -> bool {
+        self.has(self::FILETYPE_BLOCK_DEVICE)
+    }
+
+    /// Returns whether this mode is a directory.
+    #[inline]
+    #[must_use]
+    pub const fn is_directory(self) -> bool {
+        self.has(self::FILETYPE_DIRECTORY)
+    }
+
+    /// Returns whether this mode is a character device.
+    #[inline]
+    #[must_use]
+    pub const fn is_character_device(self) -> bool {
+        self.has(self::FILETYPE_CHARACTER_DEVICE)
+    }
+
+    /// Returns whether this mode is a FIFO pipe.
+    #[inline]
+    #[must_use]
+    pub const fn is_fifo_pipe(self) -> bool {
+        self.has(self::FILETYPE_SOCKET)
+    }
+}
+
+/// Provides getters for permission values.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Permissions(pub(super) u32);
+
+impl Permissions {
+    /// Returns the bit collection that contains the mode's permissions.
+    #[inline]
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0 & 0o007_777
+    }
+
+    /// Returns the bit collection that contains the mode's extra permissions.
+    #[inline]
+    #[must_use]
+    pub const fn get_extra(self) -> u32 {
+        self.0 & 0o007_000
+    }
+
+    /// Returns the bit collection that contains the mode's owner permissions.
+    #[inline]
+    #[must_use]
+    pub const fn get_owner(self) -> u32 {
+        self.0 & 0o000_700
+    }
+
+    /// Returns the bit collection that contains the mode's group permissions.
+    #[inline]
+    #[must_use]
+    pub const fn get_group(self) -> u32 {
+        self.0 & 0o000_070
+    }
+
+    /// Returns the bit collection that contains the mode's other permissions.
+    #[inline]
+    #[must_use]
+    pub const fn get_other(self) -> u32 {
+        self.0 & 0o000_007
+    }
+
+    /// Returns whether the mode's permissions contain the expected value.
+    #[inline]
+    #[must_use]
+    pub const fn has(self, kind: u32) -> bool {
+        (self.get() & kind) != 0
+    }
+
+    /// Returns whether the mode's extra permissions contain the expected value.
+    #[inline]
+    #[must_use]
+    pub const fn has_extra(self, kind: u32) -> bool {
+        (self.get_extra() & kind) != 0
+    }
+
+    /// Returns whether the mode's owner permissions contain the expected value.
+    #[inline]
+    #[must_use]
+    pub const fn has_owner(self, kind: u32) -> bool {
+        (self.get_owner() & kind) != 0
+    }
+
+    /// Returns whether the mode's group permissions contain the expected value.
+    #[inline]
+    #[must_use]
+    pub const fn has_group(self, kind: u32) -> bool {
+        (self.get_group() & kind) != 0
+    }
+
+    /// Returns whether the mode's other permissions contain the expected value.
+    #[inline]
+    #[must_use]
+    pub const fn has_other(self, kind: u32) -> bool {
+        (self.get_other() & kind) != 0
+    }
+}
+
 /// Visits all children of the given entry using the given closure.
 ///
 /// The closure takes two arguments; a reference to the parent entries, and the child entry itself.
@@ -182,7 +402,7 @@ where
     let total = collection.len();
 
     collection.into_iter().enumerate().try_for_each(|(index, (path, data))| {
-        let child = Entry::new(path, Some(data), index, total, filter);
+        let child = Entry::new(path, Some(&data), index, total, filter);
 
         visit(&[entry], &child)
     })

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2025 Jaxydog
+// Copyright © 2025–2026 Jaxydog
 //
 // This file is part of fvr.
 //
@@ -23,7 +23,7 @@ use std::path::Path;
 use recomposition::filter::Filter;
 use time::format_description::BorrowedFormatItem;
 use time::format_description::well_known::Iso8601;
-use time::{OffsetDateTime, UtcOffset};
+use time::{OffsetDateTime, SignedDuration, UtcOffset};
 
 use super::Section;
 use crate::arguments::model::TimeVisibility;
@@ -105,10 +105,10 @@ impl Section for TimeSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let Some(timestamp) = entry.data.as_ref().and_then(|v| match self.kind {
-            TimeSectionType::Created => v.created().ok(),
-            TimeSectionType::Accessed => v.accessed().ok(),
-            TimeSectionType::Modified => v.modified().ok(),
+        let Some(timestamp) = entry.data.as_ref().map(|data| match self.kind {
+            TimeSectionType::Created => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.ctime),
+            TimeSectionType::Accessed => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.atime),
+            TimeSectionType::Modified => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.mtime),
         }) else {
             return writev!(f, [
                 &[CHAR_MISSING],
@@ -116,7 +116,7 @@ impl Section for TimeSection {
             ]);
         };
 
-        let timestamp = OFFSET.with(|v| OffsetDateTime::from(timestamp).to_offset(*v));
+        let timestamp = OFFSET.with(|offset| timestamp.to_offset(*offset));
         let formatted = match self.visibility {
             TimeVisibility::Simple => timestamp.format(SIMPLE_FORMAT),
             TimeVisibility::Iso8601 => timestamp.format(&Iso8601::DEFAULT),
@@ -131,10 +131,10 @@ impl Section for TimeSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let Some(timestamp) = entry.data.as_ref().and_then(|v| match self.kind {
-            TimeSectionType::Created => v.created().ok(),
-            TimeSectionType::Accessed => v.accessed().ok(),
-            TimeSectionType::Modified => v.modified().ok(),
+        let Some(timestamp) = entry.data.as_ref().map(|data| match self.kind {
+            TimeSectionType::Created => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.ctime),
+            TimeSectionType::Accessed => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.atime),
+            TimeSectionType::Modified => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.mtime),
         }) else {
             return writev!(f, [
                 &[CHAR_MISSING],
@@ -142,7 +142,7 @@ impl Section for TimeSection {
             ] in BrightBlack);
         };
 
-        let timestamp = OFFSET.with(|v| OffsetDateTime::from(timestamp).to_offset(*v));
+        let timestamp = OFFSET.with(|offset| timestamp.to_offset(*offset));
         let formatted = match self.visibility {
             TimeVisibility::Simple => timestamp.format(SIMPLE_FORMAT),
             TimeVisibility::Iso8601 => timestamp.format(&Iso8601::DEFAULT),

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2025 Jaxydog
+// Copyright © 2025–2026 Jaxydog
 //
 // This file is part of fvr.
 //
@@ -18,92 +18,13 @@
 
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use recomposition::filter::Filter;
 
 use super::Section;
-use crate::files::Entry;
+use crate::files::{Entry, EntryMetadata, Filetype, Permissions};
 use crate::{color_bytes, writev};
-
-/// Defines constants related to file entry types.
-pub mod filetype {
-    /// A bit mask that isolates an entry's type from its mode integer.
-    pub const MASK: u32 = 0o170_000;
-
-    /// The bit pattern for a socket.
-    pub const SOCKET: u32 = 0o140_000;
-    /// The bit pattern for a symbolic link.
-    pub const SYMBOLIC_LINK: u32 = 0o120_000;
-    /// The bit pattern for a file.
-    pub const FILE: u32 = 0o100_000;
-    /// The bit pattern for a block device.
-    pub const BLOCK_DEVICE: u32 = 0o060_000;
-    /// The bit pattern for a directory.
-    pub const DIRECTORY: u32 = 0o040_000;
-    /// The bit pattern for a character device.
-    pub const CHARACTER_DEVICE: u32 = 0o020_000;
-    /// The bit pattern for a pipe.
-    pub const FIFO_PIPE: u32 = 0o010_000;
-
-    /// Returns `true` if the given mode's filetype is set to `BITS`.
-    #[inline]
-    #[must_use]
-    pub const fn test<const BITS: u32>(mode: u32) -> bool {
-        (mode & self::MASK) == BITS
-    }
-
-    /// Returns the `set` value if the filetype matches, otherwise returns `unset`.
-    #[inline]
-    pub const fn test_map<'t, T: ?Sized, const BITS: u32>(mode: u32, set: &'t T, unset: &'t T) -> &'t T {
-        if self::test::<BITS>(mode) { set } else { unset }
-    }
-}
-
-/// Defines constants related to file entry permissions.
-pub mod permissions {
-    /// A bit mask that isolates an entry's permissions from its mode integer.
-    pub const MASK: u32 = 0o7_777;
-    /// A bit mask that isolates an entry's extra permissions from its mode integer.
-    pub const MASK_EXTRA: u32 = 0o7_000;
-    /// A bit mask that isolates an entry's owner permissions from its mode integer.
-    pub const MASK_OWNER: u32 = 0o0_700;
-    /// A bit mask that isolates an entry's group permissions from its mode integer.
-    pub const MASK_GROUP: u32 = 0o0_070;
-    /// A bit mask that isolates an entry's other permissions from its mode integer.
-    pub const MASK_OTHER: u32 = 0o0_007;
-
-    /// The bit pattern for read permissions.
-    pub const READ: u32 = 0o0_444;
-    /// The bit pattern for write permissions.
-    pub const WRITE: u32 = 0o0_222;
-    /// The bit pattern for execute permissions.
-    pub const EXECUTE: u32 = 0o0_111;
-    /// The bit pattern for set user ID permissions.
-    pub const SETUID: u32 = 0o4_000;
-    /// The bit pattern for set group ID permissions.
-    pub const SETGID: u32 = 0o2_000;
-    /// The bit pattern for "sticky" permissions.
-    pub const STICKY: u32 = 0o1_000;
-
-    /// Returns `true` if the given mode's permissions contain `BITS`.
-    #[inline]
-    #[must_use]
-    pub const fn test<const MASK: u32, const BITS: u32>(mode: u32) -> bool {
-        (mode & MASK) & BITS != 0
-    }
-
-    /// Returns the `set` value if the permission is set, otherwise returns `unset`.
-    #[inline]
-    pub const fn test_map<'t, T: ?Sized, const MASK: u32, const BITS: u32>(
-        mode: u32,
-        set: &'t T,
-        unset: &'t T,
-    ) -> &'t T {
-        if self::test::<MASK, BITS>(mode) { set } else { unset }
-    }
-}
 
 /// A [`Section`] that writes an entry's filetype and permissions.
 #[derive(Clone, Copy, Debug)]
@@ -151,43 +72,45 @@ impl ModeSection {
         Self { extended }
     }
 
-    /// Returns a series of bytes that represent the filetype for the given mode.
-    #[must_use]
-    pub const fn get_type(mode: u32) -> u8 {
-        use self::filetype::{BLOCK_DEVICE, CHARACTER_DEVICE, DIRECTORY, FIFO_PIPE, FILE, MASK, SOCKET, SYMBOLIC_LINK};
+    /// Returns the ASCII flag character for the filetype.
+    const fn get_filetype_flag(filetype: Filetype) -> u8 {
+        use crate::files::{
+            FILETYPE_BLOCK_DEVICE, FILETYPE_CHARACTER_DEVICE, FILETYPE_DIRECTORY, FILETYPE_FIFO_PIPE, FILETYPE_FILE,
+            FILETYPE_SOCKET, FILETYPE_SYMBOLIC_LINK,
+        };
 
-        match mode & MASK {
-            FILE => Self::TYPE_FILE,
-            DIRECTORY => Self::TYPE_DIRECTORY,
-            SYMBOLIC_LINK => Self::TYPE_SYMBOLIC_LINK,
-            FIFO_PIPE => Self::TYPE_FIFO_PIPE,
-            SOCKET => Self::TYPE_SOCKET,
-            BLOCK_DEVICE => Self::TYPE_BLOCK_DEVICE,
-            CHARACTER_DEVICE => Self::TYPE_CHARACTER_DEVICE,
+        match filetype.get() {
+            FILETYPE_FILE => Self::TYPE_FILE,
+            FILETYPE_DIRECTORY => Self::TYPE_DIRECTORY,
+            FILETYPE_SYMBOLIC_LINK => Self::TYPE_SYMBOLIC_LINK,
+            FILETYPE_FIFO_PIPE => Self::TYPE_FIFO_PIPE,
+            FILETYPE_SOCKET => Self::TYPE_SOCKET,
+            FILETYPE_BLOCK_DEVICE => Self::TYPE_BLOCK_DEVICE,
+            FILETYPE_CHARACTER_DEVICE => Self::TYPE_CHARACTER_DEVICE,
             _ => Self::TYPE_UNKNOWN,
         }
     }
 
-    /// Returns a series of bytes that represent the permissions for the given mode.
-    #[must_use]
-    pub const fn get_permissions(mode: u32) -> [u8; 12] {
-        use self::permissions::{
-            EXECUTE, MASK_EXTRA, MASK_GROUP, MASK_OTHER, MASK_OWNER, READ, SETGID, SETUID, STICKY, WRITE, test_map,
+    /// Returns the ASCII flag characters for each permission.
+    const fn get_permission_flags(permissions: Permissions) -> [u8; 12] {
+        use crate::files::{
+            PERMISSION_EXECUTE, PERMISSION_READ, PERMISSION_SET_GID, PERMISSION_SET_UID, PERMISSION_STICKY,
+            PERMISSION_WRITE,
         };
 
         [
-            *test_map::<_, MASK_EXTRA, SETUID>(mode, &Self::PERM_SETUID, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_EXTRA, SETGID>(mode, &Self::PERM_SETGID, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_EXTRA, STICKY>(mode, &Self::PERM_SETUID, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_OWNER, READ>(mode, &Self::PERM_READ, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_OWNER, WRITE>(mode, &Self::PERM_WRITE, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_OWNER, EXECUTE>(mode, &Self::PERM_EXECUTE, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_GROUP, READ>(mode, &Self::PERM_READ, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_GROUP, WRITE>(mode, &Self::PERM_WRITE, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_GROUP, EXECUTE>(mode, &Self::PERM_EXECUTE, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_OTHER, READ>(mode, &Self::PERM_READ, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_OTHER, WRITE>(mode, &Self::PERM_WRITE, &Self::PERM_EMPTY),
-            *test_map::<_, MASK_OTHER, EXECUTE>(mode, &Self::PERM_EXECUTE, &Self::PERM_EMPTY),
+            if permissions.has_extra(PERMISSION_SET_UID) { Self::PERM_SETUID } else { Self::PERM_EMPTY },
+            if permissions.has_extra(PERMISSION_SET_GID) { Self::PERM_SETGID } else { Self::PERM_EMPTY },
+            if permissions.has_extra(PERMISSION_STICKY) { Self::PERM_STICKY } else { Self::PERM_EMPTY },
+            if permissions.has_owner(PERMISSION_READ) { Self::PERM_READ } else { Self::PERM_EMPTY },
+            if permissions.has_owner(PERMISSION_WRITE) { Self::PERM_WRITE } else { Self::PERM_EMPTY },
+            if permissions.has_owner(PERMISSION_EXECUTE) { Self::PERM_EXECUTE } else { Self::PERM_EMPTY },
+            if permissions.has_group(PERMISSION_READ) { Self::PERM_READ } else { Self::PERM_EMPTY },
+            if permissions.has_group(PERMISSION_WRITE) { Self::PERM_WRITE } else { Self::PERM_EMPTY },
+            if permissions.has_group(PERMISSION_EXECUTE) { Self::PERM_EXECUTE } else { Self::PERM_EMPTY },
+            if permissions.has_other(PERMISSION_READ) { Self::PERM_READ } else { Self::PERM_EMPTY },
+            if permissions.has_other(PERMISSION_WRITE) { Self::PERM_WRITE } else { Self::PERM_EMPTY },
+            if permissions.has_other(PERMISSION_EXECUTE) { Self::PERM_EXECUTE } else { Self::PERM_EMPTY },
         ]
     }
 }
@@ -197,10 +120,14 @@ impl Section for ModeSection {
     where
         F: Filter<(Box<Path>, Metadata)>,
     {
-        let mode = entry.data.as_ref().map(MetadataExt::mode).unwrap_or_default();
-        let permissions = Self::get_permissions(mode);
+        let permissions = entry.data.as_ref().map_or_default(EntryMetadata::permissions);
+        let permissions = Self::get_permission_flags(permissions);
+        let permissions = if self.extended { &permissions } else { &permissions[3 ..] };
 
-        writev!(f, [&[b'[', Self::get_type(mode)], if self.extended { &permissions } else { &permissions[3 ..] }, b"]"])
+        let filetype = entry.data.as_ref().map_or_default(EntryMetadata::filetype);
+        let filetype = Self::get_filetype_flag(filetype);
+
+        writev!(f, [&[b'[', filetype], permissions, b"]"])
     }
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
@@ -209,9 +136,9 @@ impl Section for ModeSection {
     {
         writev!(f, [b"["] in White)?;
 
-        let mode = entry.data.as_ref().map(MetadataExt::mode).unwrap_or_default();
+        let filetype = entry.data.as_ref().map_or_default(EntryMetadata::filetype);
 
-        match Self::get_type(mode) {
+        match Self::get_filetype_flag(filetype) {
             v @ Self::TYPE_DIRECTORY => writev!(f, [&[v]] in BrightBlue)?,
             v @ Self::TYPE_SYMBOLIC_LINK => writev!(f, [&[v]] in BrightCyan)?,
             v @ Self::TYPE_FIFO_PIPE => writev!(f, [&[v]] in BrightYellow)?,
@@ -222,10 +149,13 @@ impl Section for ModeSection {
             _ => unreachable!(),
         }
 
-        let permissions = Self::get_permissions(mode);
+        let permissions = entry.data.as_ref().map_or_default(EntryMetadata::permissions);
+        let permissions = Self::get_permission_flags(permissions);
+        let permissions = if self.extended { &permissions } else { &permissions[3 ..] };
+
         let mut buffer = Vec::<u8>::with_capacity(permissions.len() * 6);
 
-        for permission in if self.extended { &permissions } else { &permissions[3 ..] } {
+        for permission in permissions {
             buffer.extend_from_slice(match *permission {
                 Self::PERM_EMPTY => color_bytes!(BrightBlack),
                 Self::PERM_READ => color_bytes!(BrightYellow),

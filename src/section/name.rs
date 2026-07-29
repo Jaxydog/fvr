@@ -144,7 +144,7 @@ impl Section for SymlinkSection {
 
                 let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
                 let data = std::fs::symlink_metadata(real_path.as_ref()).ok();
-                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
+                let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
 
                 return NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry);
             }
@@ -158,7 +158,7 @@ impl Section for SymlinkSection {
         }
 
         let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
-        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
+        let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry)
     }
@@ -184,7 +184,7 @@ impl Section for SymlinkSection {
 
                 let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
                 let data = std::fs::symlink_metadata(real_path.as_ref()).ok();
-                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
+                let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
 
                 return NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry);
             }
@@ -198,7 +198,7 @@ impl Section for SymlinkSection {
         }
 
         let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
-        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
+        let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry)
     }

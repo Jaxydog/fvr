@@ -60,7 +60,7 @@ pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
     paths.sort_unstable_with(&sort);
 
     for (index, (path, data)) in paths.into_iter().enumerate() {
-        let entry = Entry::root(path, Some(data), &filter);
+        let entry = Entry::root(path, Some(&data), &filter);
 
         if index > 0 {
             f.write_all(b"\n")?;

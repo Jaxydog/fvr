@@ -89,7 +89,7 @@ impl Section for UserSection {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(user) = entry.data.as_ref().and_then(|v| Self::name(v.uid())) else {
+        let Some(user) = entry.data.as_ref().and_then(|data| Self::name(data.uid)) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -105,7 +105,7 @@ impl Section for UserSection {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(user) = entry.data.as_ref().and_then(|v| Self::name(v.uid())) else {
+        let Some(user) = entry.data.as_ref().and_then(|data| Self::name(data.uid)) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -166,7 +166,7 @@ impl Section for GroupSection {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(group) = entry.data.as_ref().and_then(|v| Self::name(v.gid())) else {
+        let Some(group) = entry.data.as_ref().and_then(|data| Self::name(data.gid)) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 
@@ -182,7 +182,7 @@ impl Section for GroupSection {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
-        let Some(group) = entry.data.as_ref().and_then(|v| Self::name(v.gid())) else {
+        let Some(group) = entry.data.as_ref().and_then(|data| Self::name(data.gid)) else {
             return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
         };
 

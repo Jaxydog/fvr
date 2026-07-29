@@ -19,7 +19,6 @@
 use std::collections::HashMap;
 use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -205,7 +204,7 @@ impl Section for SizeSection {
             };
         }
 
-        let size = entry.data.as_ref().map_or(0, MetadataExt::size);
+        let size = entry.data.as_ref().map_or(0, |data| data.size);
 
         if self.visibility.is_simple() {
             let mut buffer = itoa::Buffer::new();
@@ -266,7 +265,7 @@ impl Section for SizeSection {
             };
         }
 
-        let size = entry.data.as_ref().map_or(0, MetadataExt::size);
+        let size = entry.data.as_ref().map_or(0, |data| data.size);
 
         if self.visibility.is_simple() {
             let mut buffer = itoa::Buffer::new();
