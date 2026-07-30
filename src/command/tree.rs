@@ -56,6 +56,7 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
 
     paths.sort_unstable_with(&sort);
 
+    let should_use_color = arguments.color.should_be_enabled();
     let f = &mut std::io::stdout().lock();
 
     for (index, (path, data)) in paths.into_iter().enumerate() {
@@ -66,14 +67,14 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
         }
 
         if entry.can_traverse() {
-            tree_section.write(arguments.color, f, &[], &entry)?;
-            name_section.write(arguments.color, f, &[], &entry)?;
+            tree_section.write(should_use_color, f, &[], &entry)?;
+            name_section.write(should_use_color, f, &[], &entry)?;
         } else {
             let path = entry.path.absolute()?.parent().map_or_else(|| Path::new("/").into(), Box::from);
             let entry = Entry::root(path, None, &filter);
 
-            tree_section.write(arguments.color, f, &[], &entry)?;
-            name_section.write(arguments.color, f, &[], &entry)?;
+            tree_section.write(should_use_color, f, &[], &entry)?;
+            name_section.write(should_use_color, f, &[], &entry)?;
         }
 
         f.write_all(b"\n")?;
@@ -84,8 +85,8 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
             &filter,
             &sort,
             &mut |parents, entry| {
-                tree_section.write(arguments.color, f, parents, entry)?;
-                name_section.write(arguments.color, f, parents, entry)?;
+                tree_section.write(should_use_color, f, parents, entry)?;
+                name_section.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b"\n")
             },

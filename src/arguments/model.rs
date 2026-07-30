@@ -85,6 +85,14 @@ impl ColorChoice {
     pub const fn is_never(&self) -> bool {
         matches!(self, Self::Never)
     }
+
+    /// Returns whether or not color should be enabled.
+    #[must_use]
+    pub fn should_be_enabled(&self) -> bool {
+        use supports_color::Stream;
+
+        self.is_always() || (self.is_auto() && supports_color::on_cached(Stream::Stdout).is_some_and(|v| v.has_basic))
+    }
 }
 
 /// The program's subcommand.

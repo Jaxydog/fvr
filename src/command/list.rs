@@ -54,6 +54,7 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
 
     paths.sort_unstable_with(&sort);
 
+    let should_use_color = arguments.color.should_be_enabled();
     let f = &mut std::io::stdout().lock();
 
     for (index, (path, data)) in paths.into_iter().enumerate() {
@@ -64,11 +65,11 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
         }
         if total_paths > 1 {
             if entry.can_traverse() {
-                name_section.write(arguments.color, f, &[], &entry)?;
+                name_section.write(should_use_color, f, &[], &entry)?;
             } else {
                 let path = entry.path.absolute()?.parent().map_or_else(|| Path::new("/").into(), Box::from);
 
-                name_section.write(arguments.color, f, &[], &Entry::root(path, None, &filter))?;
+                name_section.write(should_use_color, f, &[], &Entry::root(path, None, &filter))?;
             }
 
             f.write_all(b":\n")?;
@@ -76,42 +77,42 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
 
         crate::files::visit_entries(&entry, &filter, &sort, |parents, entry| {
             if let Some(mode) = list_arguments.mode {
-                mode.write(arguments.color, f, parents, entry)?;
+                mode.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(size) = list_arguments.size {
-                size.write(arguments.color, f, parents, entry)?;
+                size.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(created) = list_arguments.created {
-                created.write(arguments.color, f, parents, entry)?;
+                created.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(accessed) = list_arguments.accessed {
-                accessed.write(arguments.color, f, parents, entry)?;
+                accessed.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(modified) = list_arguments.modified {
-                modified.write(arguments.color, f, parents, entry)?;
+                modified.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(user) = &list_arguments.user {
-                user.write(arguments.color, f, parents, entry)?;
+                user.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
             if let Some(group) = &list_arguments.group {
-                group.write(arguments.color, f, parents, entry)?;
+                group.write(should_use_color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
 
-            name_section.write(arguments.color, f, parents, entry)?;
+            name_section.write(should_use_color, f, parents, entry)?;
 
             f.write_all(b"\n")
         })?;

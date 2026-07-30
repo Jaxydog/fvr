@@ -21,7 +21,6 @@ use std::path::Path;
 
 use recomposition::filter::Filter;
 
-use crate::arguments::model::ColorChoice;
 use crate::files::{Entry, EntryMetadata};
 
 pub mod mode;
@@ -57,23 +56,11 @@ pub trait Section {
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write<F>(
-        &self,
-        color: ColorChoice,
-        f: &mut StdoutLock<'_>,
-        parents: &[&Entry<F>],
-        entry: &Entry<F>,
-    ) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
-        use supports_color::{Stream, on_cached};
-
-        if color.is_always() || (color.is_auto() && on_cached(Stream::Stdout).is_some_and(|v| v.has_basic)) {
-            self.write_color(f, parents, entry)
-        } else {
-            self.write_plain(f, parents, entry)
-        }
+        if color { self.write_color(f, parents, entry) } else { self.write_plain(f, parents, entry) }
     }
 }
 
