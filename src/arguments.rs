@@ -152,17 +152,26 @@ where
     use carp::ArgumentOrPositional::{Argument, Positional};
 
     match argument {
-        Argument(Short('h') | Long("help")) => Some(self::parse_help(arguments, parser)),
-        Argument(Short('V') | Long("version")) if arguments.command.is_none() => Some(self::parse_version()),
+        Argument(Short('h') | Long("help")) => Some(self::exit_and_print(SUCCESS, HELP)),
+        Argument(Short('V') | Long("version")) => Some(self::exit_and_print(
+            SUCCESS,
+            format_args!("{} v{}", env!("CARGO_BIN_NAME"), env!("CARGO_PKG_VERSION")),
+        )),
 
         Argument(Long("color")) => self::parse_color(arguments, parser),
 
-        Argument(Short('a') | Long("all")) => self::parse_all(arguments),
+        Argument(Short('a') | Long("all")) => {
+            arguments.show_hidden = true;
+            None
+        }
 
         Argument(Short('e') | Long("exclude")) => self::parse_exclude(arguments, parser),
         Argument(Short('i') | Long("include")) => self::parse_include(arguments, parser),
 
-        Argument(Short('r') | Long("resolve-symlinks")) => self::parse_resolve_symlinks(arguments),
+        Argument(Short('r') | Long("resolve-symlinks")) => {
+            arguments.resolve_symlinks = true;
+            None
+        }
 
         Argument(Long("sort")) => self::parse_sort(arguments, parser),
 
@@ -222,26 +231,6 @@ fn parse_positional(arguments: &mut Arguments, value: &str) -> Option<ParseResul
     None
 }
 
-/// Parses the help command-line argument.
-fn parse_help<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> ParseResult
-where
-    I: Iterator<Item = &'p str>,
-{
-    if let Ok(Some(value)) =
-        arguments.command.is_none().then(|| parser.parse_next_assigned_value()).transpose().map(Option::flatten)
-    {
-        // Attempt to read the next argument as a subcommand.
-        drop(self::parse_positional(arguments, value));
-    }
-
-    self::exit_and_print(SUCCESS, HELP)
-}
-
-/// Parses the version command-line argument.
-fn parse_version() -> ParseResult {
-    self::exit_and_print(SUCCESS, format_args!("{} v{}", env!("CARGO_BIN_NAME"), env!("CARGO_PKG_VERSION")))
-}
-
 /// Parses the color command-line argument.
 fn parse_color<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>) -> Option<ParseResult>
 where
@@ -260,22 +249,6 @@ where
         "never" => ColorChoice::Never,
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid color choice '{v}'"))),
     };
-
-    None
-}
-
-/// Parses the all command-line argument.
-#[inline]
-const fn parse_all(arguments: &mut Arguments) -> Option<ParseResult> {
-    arguments.show_hidden = true;
-
-    None
-}
-
-/// Parses the resolve-symlinks command-line argument.
-#[inline]
-const fn parse_resolve_symlinks(arguments: &mut Arguments) -> Option<ParseResult> {
-    arguments.resolve_symlinks = true;
 
     None
 }
@@ -444,12 +417,11 @@ where
     }) else {
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing excluded path"));
     };
-    let path = match std::fs::canonicalize(path) {
+
+    arguments.excluded.get_or_insert_default().insert(match std::fs::canonicalize(path) {
         Ok(path) => path.into_boxed_path(),
         Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
-    };
-
-    arguments.excluded.get_or_insert_default().insert(path);
+    });
 
     None
 }
@@ -465,12 +437,11 @@ where
     }) else {
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing included path"));
     };
-    let path = match std::fs::canonicalize(path) {
+
+    arguments.included.get_or_insert_default().insert(match std::fs::canonicalize(path) {
         Ok(path) => path.into_boxed_path(),
         Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
-    };
-
-    arguments.included.get_or_insert_default().insert(path);
+    });
 
     None
 }
@@ -494,10 +465,11 @@ where
         Err(error) => {
             return Some(self::exit_and_print(ERROR_CLI_USAGE, match error.kind() {
                 IntErrorKind::Empty => "missing traversal depth",
-                IntErrorKind::Zero | IntErrorKind::InvalidDigit => "depth must be a non-zero positive integer",
                 IntErrorKind::PosOverflow => "depth is too large",
-                IntErrorKind::NegOverflow => "depth is too small",
-                _ => "invalid depth",
+                IntErrorKind::Zero | IntErrorKind::InvalidDigit | IntErrorKind::NegOverflow => {
+                    "depth must be a non-zero positive integer"
+                }
+                _ => unreachable!(),
             }));
         }
     });
