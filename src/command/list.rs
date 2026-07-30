@@ -37,9 +37,9 @@ use crate::section::user::{GroupSection, UserSection};
 ///
 /// This function will return an error if the command fails.
 pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
-    let Some(SubCommand::List(list_arguments)) = arguments.command else { unreachable!() };
+    let Some(SubCommand::List(mut list_arguments)) = arguments.command else { unreachable!() };
 
-    let sort = list_arguments.sorting.clone().unwrap_or_default();
+    let sort = list_arguments.sorting.get_or_insert_default();
     let filter = recomposition::filter::from_fn(|(path, _): &(Box<Path>, _)| {
         (list_arguments.show_hidden || !is_hidden(path))
             && list_arguments.included.as_ref().is_none_or(|include| include.contains(path))
