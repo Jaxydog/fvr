@@ -47,22 +47,57 @@ cp ./target/release/fvr <destination>
 ```
 $ fvr --help
 
-fvr v0.1.0
-  An implementation of the `ls` command-line application.
+An implementation of the `ls` command-line application.
 
-Usage: fvr [SUBCOMMAND] [ARGUMENTS]
+Usage: fvr <subcommand> <arguments>
 
 Subcommands:
-  list                           List the contents of one or more directories
-  tree                           List the contents of one or more directories in a tree-based view
+  list                          List the contents of one or more directories
+  tree                          List the contents of one or more directories in a tree-like view
 
 Arguments:
-  -h, --help [SUBCOMMAND?]       Shows the command (or a subcommand)'s usage
-                                 - options: list, tree
-  -V, --version                  Shows the command's version
-      --color [CHOICE]           Determines whether to output using color
-                                 - default: auto
-                                 - options: auto, always, never
+  -h, --help                    Displays the command's usage
+  -V, --version                 Displays the command's version
+
+      --color <choice>          Determines whether the command should output ANSI color codes
+                                - default: auto
+                                - options: auto, always, never
+
+  -a, --all                     Determines whether hidden files and directories should be displayed
+
+  -e, --exclude <path>          Exclude a path from the command output
+  -i, --include <path>          Include a path in the command output
+
+  -r, --resolve-symlinks        Fully resolve symbolic link paths
+
+      --sort <order>            Determines the sorting order of each displayed entry, accepts a comma-separated list
+                                - default: directories,files,name
+                                - options: name, accessed, created, modified, size, files, symlinks, directories, hidden, reverse-*
+
+List Arguments:
+  -m, --mode <visibility>       Determines if and how the file mode of each entry is displayed
+                                - default: hide
+                                - options: hide, show, extended
+
+  -s, --size <visibility>       Determines if and how the size of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, base-2, base-10
+
+      --created <visibility>    Determines if and how the creation date of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, iso8601
+      --accessed <visibility>   Determines if and how the last access date of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, iso8601
+      --modified <visibility>   Determines if and how the last modification date of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, iso8601
+
+      --user                    Display the name of each entry's owner
+      --group                   Display the name of each entry's owner group
+
+Tree Arguments:
+  -d, --depth <depth>           Determines how many layers deep the tree should display
 ```
 
 ## License
