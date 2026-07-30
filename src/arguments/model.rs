@@ -22,7 +22,6 @@ use std::path::Path;
 
 use recomposition::sort::Sort;
 
-use crate::arguments::schema::CommandSchema;
 use crate::files::EntryMetadata;
 use crate::section::mode::ModeSection;
 use crate::section::size::SizeSection;
@@ -48,31 +47,6 @@ pub struct Arguments {
     pub sort_order: Option<SortOrder>,
     /// The program's selected subcommand.
     pub command: Option<SubCommand>,
-}
-
-impl Arguments {
-    /// Returns the current schema of this [`Arguments`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if the current schema has not been defined.
-    #[expect(clippy::expect_used, reason = "we cannot return a schema for a subcommand if it has not been defined")]
-    pub const fn current_schema(&self) -> CommandSchema<'static> {
-        #[inline]
-        const fn sub_schema(index: usize) -> CommandSchema<'static> {
-            let list = super::SCHEMA.commands.expect("no subcommands have been defined");
-
-            assert!(index < list.len(), "missing required subcommand definition");
-
-            list[index]
-        }
-
-        match self.command {
-            None => super::SCHEMA,
-            Some(SubCommand::List(..)) => sub_schema(0),
-            Some(SubCommand::Tree(..)) => sub_schema(1),
-        }
-    }
 }
 
 /// Determines whether to output using color.

@@ -25,9 +25,6 @@ use carp::{ArgumentOrPositional, Parser};
 use self::model::{
     Arguments, ColorChoice, ListArguments, SizeVisibility, SortOrder, SubCommand, TimeVisibility, TreeArguments,
 };
-use crate::arguments::schema::{
-    ArgumentSchema, ArgumentSchemaBuilder, CommandSchema, CommandSchemaBuilder, ValueSchema, ValueSchemaBuilder,
-};
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 use crate::section::mode::ModeSection;
 use crate::section::size::SizeSection;
@@ -35,129 +32,63 @@ use crate::section::time::{TimeSection, TimeSectionType};
 use crate::section::user::{GroupSection, UserSection};
 
 pub mod model;
-pub mod schema;
 
-/// Defines the command's schema.
-pub const SCHEMA: CommandSchema<'static> = {
-    const PATHS_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("PATHS").about("The paths to display").list().build();
-    const PATH_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("PATH").about("The path").required().build();
-    const COLOR_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("CHOICE").required().default("auto").options(&["auto", "always", "never"]).build();
-    const SORT_ORDER_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("ORDER")
-        .required()
-        .list()
-        .default("directories,files,name")
-        .options(&[
-            "name",
-            "accessed",
-            "created",
-            "modified",
-            "size",
-            "files",
-            "symlinks",
-            "directories",
-            "hidden",
-            "reverse-*",
-        ])
-        .build();
+/// The text displayed when `--help` is used.
+pub const HELP: &str = concat!(
+    env!("CARGO_PKG_DESCRIPTION"),
+    "\n\nUsage: ",
+    env!("CARGO_BIN_NAME"),
+    " <subcommand> <arguments>
 
-    const HELP_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("help", "Shows the command's usage").short('h').build();
-    const COLOR_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("color", "Determines whether to output using color").value(COLOR_VALUE).build();
-    const ALL_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("all", "Include hidden files and directories").short('a').build();
-    const EXCLUDE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("exclude", "Exclude a directory from output").short('e').value(PATH_VALUE).build();
-    const INCLUDE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("include", "Include a directory in the output").short('i').value(PATH_VALUE).build();
-    const RESOLVE_SYMLINKS_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("resolve-symlinks", "Fully resolve symbolic link paths").short('r').build();
-    const SORT_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("sort", "Control how entries are sorted").value(SORT_ORDER_VALUE).build();
+Subcommands:
+  list                          List the contents of one or more directories
+  tree                          List the contents of one or more directories in a tree-like view
 
-    const MODE_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("CHOICE").required().default("hide").options(&["hide", "show", "extended"]).build();
-    const SIZE_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("CHOICE")
-        .required()
-        .default("hide")
-        .options(&["hide", "simple", "base-2", "base-10"])
-        .build();
-    const TIME_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("CHOICE").required().default("hide").options(&["hide", "simple", "iso8601"]).build();
-    const DEPTH_VALUE: ValueSchema<'static> = ValueSchemaBuilder::new("DEPTH").required().build();
+Arguments:
+  -h, --help                    Displays the command's usage
+  -V, --version                 Displays the command's version
 
-    const MODE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("mode", "Control how entry modes are shown").short('m').value(MODE_VALUE).build();
-    const SIZE_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("size", "Control how entry sizes are shown").short('s').value(SIZE_VALUE).build();
-    const CREATED_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("created", "Control how creation dates are shown").value(TIME_VALUE).build();
-    const ACCESSED_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("accessed", "Control how access dates are shown").value(TIME_VALUE).build();
-    const MODIFIED_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("modified", "Control how modification dates are shown").value(TIME_VALUE).build();
-    const USER_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("user", "Show all entry user names").build();
-    const GROUP_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("group", "Show all entry group names").build();
-    const DEPTH_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("depth", "Control how deep to traverse").short('d').value(DEPTH_VALUE).build();
+      --color <choice>          Determines whether the command should output ANSI color codes
+                                - default: auto
+                                - options: auto, always, never
 
-    const LIST_COMMAND: CommandSchema<'static> =
-        CommandSchemaBuilder::new("list", "List the contents of one or more directories")
-            .positionals(&[PATHS_VALUE])
-            .arguments(&[
-                HELP_ARGUMENT,
-                COLOR_ARGUMENT,
-                ALL_ARGUMENT,
-                EXCLUDE_ARGUMENT,
-                INCLUDE_ARGUMENT,
-                RESOLVE_SYMLINKS_ARGUMENT,
-                SORT_ARGUMENT,
-                MODE_ARGUMENT,
-                SIZE_ARGUMENT,
-                CREATED_ARGUMENT,
-                ACCESSED_ARGUMENT,
-                MODIFIED_ARGUMENT,
-                USER_ARGUMENT,
-                GROUP_ARGUMENT,
-            ])
-            .build();
+  -a, --all                     Determines whether hidden files and directories should be displayed
 
-    const TREE_COMMAND: CommandSchema<'static> =
-        CommandSchemaBuilder::new("tree", "List the contents of one or more directories in a tree-based view")
-            .positionals(&[PATHS_VALUE])
-            .arguments(&[
-                HELP_ARGUMENT,
-                COLOR_ARGUMENT,
-                ALL_ARGUMENT,
-                INCLUDE_ARGUMENT,
-                EXCLUDE_ARGUMENT,
-                RESOLVE_SYMLINKS_ARGUMENT,
-                SORT_ARGUMENT,
-                DEPTH_ARGUMENT,
-            ])
-            .build();
+  -e, --exclude <path>          Exclude a path from the command output
+  -i, --include <path>          Include a path in the command output
 
-    const SUBCOMMAND_VALUE: ValueSchema<'static> =
-        ValueSchemaBuilder::new("SUBCOMMAND").options(&[LIST_COMMAND.name, TREE_COMMAND.name]).build();
+  -r, --resolve-symlinks        Fully resolve symbolic link paths
 
-    const HELP_WITH_SUBCOMMAND_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("help", "Shows the command (or a subcommand)'s usage")
-            .short('h')
-            .value(SUBCOMMAND_VALUE)
-            .build();
-    const VERSION_ARGUMENT: ArgumentSchema<'static> =
-        ArgumentSchemaBuilder::new("version", "Shows the command's version").short('V').build();
+      --sort <order>            Determines the sorting order of each displayed entry, accepts a comma-separated list
+                                - default: directories,files,name
+                                - options: name, accessed, created, modified, size, files, symlinks, directories, \
+     hidden, reverse-*
 
-    CommandSchemaBuilder::new(env!("CARGO_BIN_NAME"), env!("CARGO_PKG_DESCRIPTION"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .arguments(&[HELP_WITH_SUBCOMMAND_ARGUMENT, VERSION_ARGUMENT, COLOR_ARGUMENT])
-        .commands(&[LIST_COMMAND, TREE_COMMAND])
-}
-.build();
+List Arguments:
+  -m, --mode <visibility>       Determines if and how the file mode of each entry is displayed
+                                - default: hide
+                                - options: hide, show, extended
+
+  -s, --size <visibility>       Determines if and how the size of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, base-2, base-10
+
+      --created <visibility>    Determines if and how the creation date of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, iso8601
+      --accessed <visibility>   Determines if and how the last access date of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, iso8601
+      --modified <visibility>   Determines if and how the last modification date of each entry is displayed
+                                - default: hide
+                                - options: hide, simple, iso8601
+
+      --user                    Display the name of each entry's owner
+      --group                   Display the name of each entry's owner group
+
+Tree Arguments:
+  -d, --depth <depth>           Determines how many layers deep the tree should display"
+);
 
 /// A result of trying to parse the application's command-line arguments.
 pub enum ParseResult {
@@ -223,18 +154,26 @@ where
     match argument {
         Argument(Short('h') | Long("help")) => Some(self::parse_help(arguments, parser)),
         Argument(Short('V') | Long("version")) if arguments.command.is_none() => Some(self::parse_version()),
+
         Argument(Long("color")) => self::parse_color(arguments, parser),
-        Argument(Short('a') | Long("all")) if arguments.command.is_some() => self::parse_all(arguments),
-        Argument(Short('r') | Long("resolve-symlinks")) if arguments.command.is_some() => {
-            self::parse_resolve_symlinks(arguments)
-        }
-        Argument(Long("sort")) if arguments.command.is_some() => self::parse_sort(arguments, parser),
+
+        Argument(Short('a') | Long("all")) => self::parse_all(arguments),
+
+        Argument(Short('e') | Long("exclude")) => self::parse_exclude(arguments, parser),
+        Argument(Short('i') | Long("include")) => self::parse_include(arguments, parser),
+
+        Argument(Short('r') | Long("resolve-symlinks")) => self::parse_resolve_symlinks(arguments),
+
+        Argument(Long("sort")) => self::parse_sort(arguments, parser),
+
         Argument(Short('m') | Long("mode")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_mode(arguments, parser)
         }
+
         Argument(Short('s') | Long("size")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_size(arguments, parser)
         }
+
         Argument(Long("created")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, TimeSectionType::Created)
         }
@@ -244,17 +183,18 @@ where
         Argument(Long("modified")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_time(arguments, parser, TimeSectionType::Modified)
         }
+
         Argument(Short('u') | Long("user")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_user(arguments)
         }
         Argument(Short('g') | Long("group")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
             self::parse_group(arguments)
         }
-        Argument(Short('e') | Long("exclude")) if arguments.command.is_some() => self::parse_exclude(arguments, parser),
-        Argument(Short('i') | Long("include")) if arguments.command.is_some() => self::parse_include(arguments, parser),
+
         Argument(Short('d') | Long("depth")) if arguments.command.as_ref().is_some_and(SubCommand::is_tree) => {
             self::parse_depth(arguments, parser)
         }
+
         Positional(value) => self::parse_positional(arguments, value),
         Argument(_) => Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("unexpected argument `{argument}`"))),
     }
@@ -294,10 +234,7 @@ where
         drop(self::parse_positional(arguments, value));
     }
 
-    match self::schema::write_help(arguments.current_schema(), &mut std::io::stdout()) {
-        Ok(()) => ParseResult::Exit(SUCCESS),
-        Err(error) => self::exit_and_print(ERROR_GENERIC, error),
-    }
+    self::exit_and_print(SUCCESS, HELP)
 }
 
 /// Parses the version command-line argument.
