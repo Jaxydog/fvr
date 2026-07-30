@@ -17,14 +17,13 @@
 //! Implements sections related to entry names.
 
 use std::borrow::Cow;
-use std::fs::Metadata;
 use std::io::{ErrorKind, Result, StdoutLock};
 use std::path::Path;
 
 use recomposition::filter::Filter;
 
 use super::Section;
-use crate::files::Entry;
+use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
 /// A [`Section`] that writes an entry's name.
@@ -55,7 +54,7 @@ impl NameSection {
 impl Section for NameSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
@@ -77,7 +76,7 @@ impl Section for NameSection {
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
@@ -125,7 +124,7 @@ impl SymlinkSection {
 impl Section for SymlinkSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let link_path = std::fs::read_link(&entry.path)?;
         let real_path = if link_path.is_relative()
@@ -137,14 +136,14 @@ impl Section for SymlinkSection {
         };
 
         let data = match std::fs::metadata(real_path.as_ref()) {
-            Ok(data) => Some(data),
+            Ok(data) => Some(EntryMetadata::new(&data)),
             Err(error) if error.kind() == ErrorKind::NotFound => None,
             Err(error) if error.kind() == ErrorKind::FilesystemLoop => {
                 writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "])?;
 
                 let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
-                let data = std::fs::symlink_metadata(real_path.as_ref()).ok();
-                let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
+                let data = std::fs::symlink_metadata(real_path.as_ref()).ok().map(|m| EntryMetadata::new(&m));
+                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
                 return NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry);
             }
@@ -158,14 +157,14 @@ impl Section for SymlinkSection {
         }
 
         let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
-        let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
+        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry)
     }
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let link_path = std::fs::read_link(&entry.path)?;
         let real_path = if link_path.is_relative()
@@ -177,14 +176,14 @@ impl Section for SymlinkSection {
         };
 
         let data = match std::fs::metadata(real_path.as_ref()) {
-            Ok(data) => Some(data),
+            Ok(data) => Some(EntryMetadata::new(&data)),
             Err(error) if error.kind() == ErrorKind::NotFound => None,
             Err(error) if error.kind() == ErrorKind::FilesystemLoop => {
                 writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "] in Cyan)?;
 
                 let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
-                let data = std::fs::symlink_metadata(real_path.as_ref()).ok();
-                let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
+                let data = std::fs::symlink_metadata(real_path.as_ref()).ok().map(|m| EntryMetadata::new(&m));
+                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
                 return NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry);
             }
@@ -198,7 +197,7 @@ impl Section for SymlinkSection {
         }
 
         let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
-        let entry = Entry::root(path.into_boxed_path(), data.as_ref(), entry.filter);
+        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
         NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry)
     }

@@ -59,7 +59,7 @@ pub const PERMISSION_STICKY: u32 = 0o001_000;
 #[derive(Clone, Debug)]
 pub struct Entry<'e, F>
 where
-    F: Filter<(Box<Path>, Metadata)>,
+    F: Filter<(Box<Path>, EntryMetadata)>,
 {
     /// The entry's filepath.
     pub path: Box<Path>,
@@ -79,15 +79,15 @@ where
 
 impl<'e, F> Entry<'e, F>
 where
-    F: Filter<(Box<Path>, Metadata)>,
+    F: Filter<(Box<Path>, EntryMetadata)>,
 {
     /// Creates a new [`Entry`] using the given path and optional data.
     #[inline]
     #[must_use]
-    pub fn new(path: Box<Path>, data: Option<&Metadata>, index: usize, total: usize, filter: &'e F) -> Self {
+    pub const fn new(path: Box<Path>, data: Option<EntryMetadata>, index: usize, total: usize, filter: &'e F) -> Self {
         Self {
             path,
-            data: data.map(EntryMetadata::new),
+            data,
             index,
             total,
             filter,
@@ -101,7 +101,7 @@ where
     /// This entry will have an index of 0, a total count of 1.
     #[inline]
     #[must_use]
-    pub fn root(path: Box<Path>, data: Option<&Metadata>, filter: &'e F) -> Self {
+    pub const fn root(path: Box<Path>, data: Option<EntryMetadata>, filter: &'e F) -> Self {
         Self::new(path, data, 0, 1, filter)
     }
 
@@ -171,10 +171,14 @@ where
     pub fn has_children(&self) -> bool {
         *self.has_children_cache.get_or_init(|| {
             // This call can be very expensive and slow, so we cache the result.
-            std::fs::read_dir(&self.path).is_ok_and(|mut v| {
+            std::fs::read_dir(&self.path).is_ok_and(|mut iterator| {
                 // Search for at least one child that matches the filter.
-                v.any(|v| {
-                    v.is_ok_and(|v| v.metadata().is_ok_and(|m| self.filter.test(&(v.path().into_boxed_path(), m))))
+                iterator.any(|result| {
+                    result.is_ok_and(|entry| {
+                        entry.metadata().is_ok_and(|metadata| {
+                            self.filter.test(&(entry.path().into_boxed_path(), EntryMetadata::new(&metadata)))
+                        })
+                    })
                 })
             })
         })
@@ -384,8 +388,8 @@ impl Permissions {
 /// This function will return an error if the entry's children could not be accessed or the closure fails.
 pub fn visit_entries<F, S, V>(entry: &Entry<F>, filter: &F, sort: &S, mut visit: V) -> Result<()>
 where
-    F: Filter<(Box<Path>, Metadata)>,
-    S: Sort<(Box<Path>, Metadata)>,
+    F: Filter<(Box<Path>, EntryMetadata)>,
+    S: Sort<(Box<Path>, EntryMetadata)>,
     V: FnMut(&[&Entry<F>], &Entry<F>) -> Result<()>,
 {
     if !entry.can_traverse() {
@@ -393,16 +397,16 @@ where
     }
 
     let mut collection = std::fs::read_dir(&entry.path)?
-        .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path().into_boxed_path(), d))))
+        .map(|v| v.and_then(|v| v.metadata().map(|d| (v.path().into_boxed_path(), EntryMetadata::new(&d)))))
         .filter(|v| v.as_ref().map_or(true, |v| filter.test(v)))
-        .collect::<Result<Box<[(Box<Path>, Metadata)]>>>()?;
+        .collect::<Result<Box<[(Box<Path>, EntryMetadata)]>>>()?;
 
     collection.sort_unstable_with(sort);
 
     let total = collection.len();
 
     collection.into_iter().enumerate().try_for_each(|(index, (path, data))| {
-        let child = Entry::new(path, Some(&data), index, total, filter);
+        let child = Entry::new(path, Some(data), index, total, filter);
 
         visit(&[entry], &child)
     })
@@ -423,15 +427,15 @@ pub fn visit_entries_recursive<F, S, V>(
     visit: &mut V,
 ) -> Result<()>
 where
-    F: Filter<(Box<Path>, Metadata)>,
-    S: Sort<(Box<Path>, Metadata)>,
+    F: Filter<(Box<Path>, EntryMetadata)>,
+    S: Sort<(Box<Path>, EntryMetadata)>,
     V: FnMut(&[&Entry<F>], &Entry<F>) -> Result<()>,
 {
     #[inline]
     fn inner<F, S, V>(entries: &[&Entry<F>], max_depth: usize, filter: &F, sort: &S, visit: &mut V) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
-        S: Sort<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
+        S: Sort<(Box<Path>, EntryMetadata)>,
         V: FnMut(&[&Entry<F>], &Entry<F>) -> Result<()>,
     {
         if max_depth == 0 {

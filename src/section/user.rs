@@ -19,7 +19,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -28,7 +27,7 @@ use std::rc::Rc;
 use recomposition::filter::Filter;
 
 use super::Section;
-use crate::files::Entry;
+use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
 /// The byte used when the user is missing.
@@ -84,7 +83,7 @@ impl UserSection {
 impl Section for UserSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
@@ -100,7 +99,7 @@ impl Section for UserSection {
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
@@ -161,7 +160,7 @@ impl GroupSection {
 impl Section for GroupSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
@@ -177,7 +176,7 @@ impl Section for GroupSection {
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
         let length = parent_path.map_or(MAX_LEN, Self::max_len);

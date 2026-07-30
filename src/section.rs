@@ -16,14 +16,13 @@
 
 //! Provides custom display implementations for various types of file entry data.
 
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::path::Path;
 
 use recomposition::filter::Filter;
 
 use crate::arguments::model::ColorChoice;
-use crate::files::Entry;
+use crate::files::{Entry, EntryMetadata};
 
 pub mod mode;
 pub mod name;
@@ -42,7 +41,7 @@ pub trait Section {
     /// This function will return an error if the section fails to write for any reason.
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>;
+        F: Filter<(Box<Path>, EntryMetadata)>;
 
     /// Writes this section into the given writer using color.
     ///
@@ -51,7 +50,7 @@ pub trait Section {
     /// This function will return an error if the section fails to write for any reason.
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>;
+        F: Filter<(Box<Path>, EntryMetadata)>;
 
     /// Writes this section into the given writer, determining whether to use color based on the given [`ColorChoice`].
     ///
@@ -66,7 +65,7 @@ pub trait Section {
         entry: &Entry<F>,
     ) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         use supports_color::{Stream, on_cached};
 

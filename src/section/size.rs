@@ -17,7 +17,6 @@
 //! Implements a section that displays an entry's size.
 
 use std::collections::HashMap;
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::path::Path;
 use std::sync::Mutex;
@@ -26,7 +25,7 @@ use recomposition::filter::Filter;
 
 use super::Section;
 use crate::arguments::model::SizeVisibility;
-use crate::files::Entry;
+use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
 /// Defines human-readable units.
@@ -179,7 +178,7 @@ impl SizeSection {
 impl Section for SizeSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         if entry.is_dir() {
             let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
@@ -240,7 +239,7 @@ impl Section for SizeSection {
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         if entry.is_dir() {
             let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));

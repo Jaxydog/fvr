@@ -16,7 +16,6 @@
 
 //! Implements sections related to entry timestamps.
 
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::path::Path;
 
@@ -27,7 +26,7 @@ use time::{OffsetDateTime, SignedDuration, UtcOffset};
 
 use super::Section;
 use crate::arguments::model::TimeVisibility;
-use crate::files::Entry;
+use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
 /// The byte used when the creation date cannot be determined.
@@ -103,7 +102,7 @@ impl TimeSection {
 impl Section for TimeSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let Some(timestamp) = entry.data.as_ref().map(|data| match self.kind {
             TimeSectionType::Created => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.ctime),
@@ -129,7 +128,7 @@ impl Section for TimeSection {
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let Some(timestamp) = entry.data.as_ref().map(|data| match self.kind {
             TimeSectionType::Created => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.ctime),

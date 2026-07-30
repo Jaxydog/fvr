@@ -17,14 +17,13 @@
 //! Defines the command's argument data types.
 
 use std::collections::HashSet;
-use std::fs::Metadata;
 use std::num::NonZero;
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use recomposition::sort::Sort;
 
 use crate::arguments::schema::CommandSchema;
+use crate::files::EntryMetadata;
 use crate::section::mode::ModeSection;
 use crate::section::size::SizeSection;
 use crate::section::time::TimeSection;
@@ -222,20 +221,24 @@ impl SortOrder {
     }
 }
 
-impl Sort<(Box<Path>, Metadata)> for SortOrder {
-    fn compare(&self, lhs: &(Box<Path>, Metadata), rhs: &(Box<Path>, Metadata)) -> std::cmp::Ordering {
+impl Sort<(Box<Path>, EntryMetadata)> for SortOrder {
+    fn compare(&self, lhs: &(Box<Path>, EntryMetadata), rhs: &(Box<Path>, EntryMetadata)) -> std::cmp::Ordering {
         use recomposition::sort::{order, partial_order};
 
         match self {
             Self::Name => order().map_ref(Path::as_os_str).compare(&lhs.0, &rhs.0),
-            Self::Accessed => partial_order().reverse().map(|m: &Metadata| m.accessed().ok()).compare(&lhs.1, &rhs.1),
-            Self::Created => partial_order().reverse().map(|m: &Metadata| m.created().ok()).compare(&lhs.1, &rhs.1),
-            Self::Modified => partial_order().reverse().map(|m: &Metadata| m.modified().ok()).compare(&lhs.1, &rhs.1),
-            Self::Size => order().map(MetadataExt::size).compare(&lhs.1, &rhs.1),
+            Self::Accessed => partial_order().reverse().map(|m: &EntryMetadata| m.atime).compare(&lhs.1, &rhs.1),
+            Self::Created => partial_order().reverse().map(|m: &EntryMetadata| m.ctime).compare(&lhs.1, &rhs.1),
+            Self::Modified => partial_order().reverse().map(|m: &EntryMetadata| m.mtime).compare(&lhs.1, &rhs.1),
+            Self::Size => order().map(|m: &EntryMetadata| m.size).compare(&lhs.1, &rhs.1),
             Self::Hidden => order().reverse().map(|p| crate::files::is_hidden(p)).compare(&lhs.0, &rhs.0),
-            Self::Directories => order().reverse().map(Metadata::is_dir).compare(&lhs.1, &rhs.1),
-            Self::Files => order().reverse().map(Metadata::is_file).compare(&lhs.1, &rhs.1),
-            Self::Symlinks => order().reverse().map(Metadata::is_symlink).compare(&lhs.1, &rhs.1),
+            Self::Directories => {
+                order().reverse().map(|m: &EntryMetadata| m.filetype().is_directory()).compare(&lhs.1, &rhs.1)
+            }
+            Self::Files => order().reverse().map(|m: &EntryMetadata| m.filetype().is_file()).compare(&lhs.1, &rhs.1),
+            Self::Symlinks => {
+                order().reverse().map(|m: &EntryMetadata| m.filetype().is_symbolic_link()).compare(&lhs.1, &rhs.1)
+            }
             Self::Reverse(sort_order) => sort_order.reverse().compare(lhs, rhs),
             Self::Then(orders) => (&orders.0).then(&orders.1).compare(lhs, rhs),
         }

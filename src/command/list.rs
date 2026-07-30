@@ -16,14 +16,13 @@
 
 //! Implements the list subcommand.
 
-use std::fs::Metadata;
 use std::io::Write;
 use std::path::Path;
 
 use recomposition::sort::ListSortExt;
 
 use crate::arguments::model::{Arguments, SubCommand};
-use crate::files::{Entry, is_hidden};
+use crate::files::{Entry, EntryMetadata, is_hidden};
 use crate::section::Section;
 use crate::section::name::NameSection;
 
@@ -48,17 +47,17 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
     let paths = arguments.paths.into_iter().map(|path| {
         let data = std::fs::symlink_metadata(&path)?;
 
-        Ok((path, data))
+        Ok((path, EntryMetadata::new(&data)))
     });
 
-    let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, Metadata)]>>>()?;
+    let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, EntryMetadata)]>>>()?;
 
     paths.sort_unstable_with(&sort);
 
     let f = &mut std::io::stdout().lock();
 
     for (index, (path, data)) in paths.into_iter().enumerate() {
-        let entry = Entry::new(path, Some(&data), index, total_paths, &filter);
+        let entry = Entry::new(path, Some(data), index, total_paths, &filter);
 
         if index > 0 {
             f.write_all(b"\n")?;

@@ -16,7 +16,6 @@
 
 //! Implements a section that displays an entry's filetype and permissions.
 
-use std::fs::Metadata;
 use std::io::{Result, StdoutLock};
 use std::path::Path;
 
@@ -118,7 +117,7 @@ impl ModeSection {
 impl Section for ModeSection {
     fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let permissions = entry.data.as_ref().map_or_default(EntryMetadata::permissions);
         let permissions = Self::get_permission_flags(permissions);
@@ -132,7 +131,7 @@ impl Section for ModeSection {
 
     fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, Metadata)>,
+        F: Filter<(Box<Path>, EntryMetadata)>,
     {
         writev!(f, [b"["] in White)?;
 
