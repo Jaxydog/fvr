@@ -47,8 +47,6 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
             && !arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
     });
 
-    let f = &mut std::io::stdout().lock();
-
     let paths = arguments.paths.into_iter().map(|path| {
         let data = std::fs::symlink_metadata(&path)?;
 
@@ -58,6 +56,8 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
     let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, Metadata)]>>>()?;
 
     paths.sort_unstable_with(&sort);
+
+    let f = &mut std::io::stdout().lock();
 
     for (index, (path, data)) in paths.into_iter().enumerate() {
         let entry = Entry::root(path, Some(&data), &filter);

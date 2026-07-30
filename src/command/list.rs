@@ -25,11 +25,7 @@ use recomposition::sort::ListSortExt;
 use crate::arguments::model::{Arguments, SubCommand};
 use crate::files::{Entry, is_hidden};
 use crate::section::Section;
-use crate::section::mode::ModeSection;
 use crate::section::name::NameSection;
-use crate::section::size::SizeSection;
-use crate::section::time::TimeSection;
-use crate::section::user::{GroupSection, UserSection};
 
 /// Runs the command.
 ///
@@ -39,33 +35,6 @@ use crate::section::user::{GroupSection, UserSection};
 pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
     let Some(SubCommand::List(list_arguments)) = arguments.command else { unreachable!() };
 
-    let mode_section = if list_arguments.mode.is_hide() {
-        None //
-    } else {
-        Some(ModeSection::new(list_arguments.mode.is_extended()))
-    };
-    let size_section = if list_arguments.size.is_hide() {
-        None //
-    } else {
-        Some(SizeSection::new(list_arguments.size))
-    };
-    let created_section = if list_arguments.created.is_hide() {
-        None //
-    } else {
-        Some(TimeSection::created(list_arguments.created))
-    };
-    let accessed_section = if list_arguments.accessed.is_hide() {
-        None //
-    } else {
-        Some(TimeSection::accessed(list_arguments.accessed))
-    };
-    let modified_section = if list_arguments.modified.is_hide() {
-        None //
-    } else {
-        Some(TimeSection::modified(list_arguments.modified))
-    };
-    let user_section = list_arguments.user.then_some(UserSection);
-    let group_section = list_arguments.group.then_some(GroupSection);
     let name_section = NameSection::new(true, arguments.resolve_symlinks);
 
     let sort = arguments.sort_order.get_or_insert_default();
@@ -107,37 +76,37 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
         }
 
         crate::files::visit_entries(&entry, &filter, &sort, |parents, entry| {
-            if let Some(mode) = &mode_section {
+            if let Some(mode) = list_arguments.mode {
                 mode.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
-            if let Some(size) = &size_section {
+            if let Some(size) = list_arguments.size {
                 size.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
-            if let Some(created) = &created_section {
+            if let Some(created) = list_arguments.created {
                 created.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
-            if let Some(accessed) = &accessed_section {
+            if let Some(accessed) = list_arguments.accessed {
                 accessed.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
-            if let Some(modified) = &modified_section {
+            if let Some(modified) = list_arguments.modified {
                 modified.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
-            if let Some(user) = &user_section {
+            if let Some(user) = &list_arguments.user {
                 user.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;
             }
-            if let Some(group) = &group_section {
+            if let Some(group) = &list_arguments.group {
                 group.write(arguments.color, f, parents, entry)?;
 
                 f.write_all(b" ")?;

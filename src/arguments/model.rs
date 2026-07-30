@@ -25,9 +25,13 @@ use std::path::Path;
 use recomposition::sort::Sort;
 
 use crate::arguments::schema::CommandSchema;
+use crate::section::mode::ModeSection;
+use crate::section::size::SizeSection;
+use crate::section::time::TimeSection;
+use crate::section::user::{GroupSection, UserSection};
 
 /// The program's command-line arguments.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Arguments {
     /// The paths to list.
     pub paths: Vec<Box<Path>>,
@@ -111,6 +115,7 @@ impl ColorChoice {
 }
 
 /// The program's subcommand.
+#[derive(Debug)]
 pub enum SubCommand {
     /// The list subcommand.
     List(ListArguments),
@@ -134,45 +139,29 @@ impl SubCommand {
     pub const fn is_tree(&self) -> bool {
         matches!(self, Self::Tree(..))
     }
-
-    /// Returns the inner value of this subcommand if it is a [`List`].
-    ///
-    /// [`List`]: SubCommand::List
-    #[must_use]
-    pub const fn as_list(&self) -> Option<&ListArguments> {
-        if let Self::List(v) = self { Some(v) } else { None }
-    }
-
-    /// Returns the inner value of this subcommand if it is a [`Tree`].
-    ///
-    /// [`Tree`]: SubCommand::Tree
-    #[must_use]
-    pub const fn as_tree(&self) -> Option<&TreeArguments> {
-        if let Self::Tree(v) = self { Some(v) } else { None }
-    }
 }
 
 /// The program's command-line arguments for the list subcommand.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ListArguments {
     /// The preferred mode visibility.
-    pub mode: ModeVisibility,
+    pub mode: Option<ModeSection>,
     /// The preferred size visibility.
-    pub size: SizeVisibility,
+    pub size: Option<SizeSection>,
     /// The preferred creation date visibility.
-    pub created: TimeVisibility,
+    pub created: Option<TimeSection>,
     /// The preferred access date visibility.
-    pub accessed: TimeVisibility,
+    pub accessed: Option<TimeSection>,
     /// The preferred modification date visibility.
-    pub modified: TimeVisibility,
+    pub modified: Option<TimeSection>,
     /// Whether to show owner users.
-    pub user: bool,
+    pub user: Option<UserSection>,
     /// Whether to show owner groups.
-    pub group: bool,
+    pub group: Option<GroupSection>,
 }
 
 /// The program's command-line arguments for the tree subcommand.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TreeArguments {
     /// The depth of the search.
     pub max_depth: Option<NonZero<usize>>,
@@ -256,44 +245,6 @@ impl Sort<(Box<Path>, Metadata)> for SortOrder {
 impl Default for SortOrder {
     fn default() -> Self {
         Self::Directories.then(Self::Files).then(Self::Name)
-    }
-}
-
-/// Determines whether to display an entry's UNIX file mode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ModeVisibility {
-    /// Do not show entry modes.
-    #[default]
-    Hide,
-    /// Show standard entry modes.
-    Show,
-    /// Show extended entry modes.
-    Extended,
-}
-
-impl ModeVisibility {
-    /// Returns `true` if the mode visibility is [`Hide`].
-    ///
-    /// [`Hide`]: ModeVisibility::Hide
-    #[must_use]
-    pub const fn is_hide(&self) -> bool {
-        matches!(self, Self::Hide)
-    }
-
-    /// Returns `true` if the mode visibility is [`Show`].
-    ///
-    /// [`Show`]: ModeVisibility::Show
-    #[must_use]
-    pub const fn is_show(&self) -> bool {
-        matches!(self, Self::Show)
-    }
-
-    /// Returns `true` if the mode visibility is [`Extended`].
-    ///
-    /// [`Extended`]: ModeVisibility::Extended
-    #[must_use]
-    pub const fn is_extended(&self) -> bool {
-        matches!(self, Self::Extended)
     }
 }
 

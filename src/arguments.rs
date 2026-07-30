@@ -23,14 +23,16 @@ use std::path::{Path, PathBuf};
 use carp::{ArgumentOrPositional, Parser};
 
 use self::model::{
-    Arguments, ColorChoice, ListArguments, ModeVisibility, SizeVisibility, SortOrder, SubCommand, TimeVisibility,
-    TreeArguments,
+    Arguments, ColorChoice, ListArguments, SizeVisibility, SortOrder, SubCommand, TimeVisibility, TreeArguments,
 };
 use crate::arguments::schema::{
     ArgumentSchema, ArgumentSchemaBuilder, CommandSchema, CommandSchemaBuilder, ValueSchema, ValueSchemaBuilder,
 };
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
-use crate::section::time::TimeSectionType;
+use crate::section::mode::ModeSection;
+use crate::section::size::SizeSection;
+use crate::section::time::{TimeSection, TimeSectionType};
+use crate::section::user::{GroupSection, UserSection};
 
 pub mod model;
 pub mod schema;
@@ -402,9 +404,9 @@ where
     let Some(SubCommand::List(ListArguments { mode, .. })) = arguments.command.as_mut() else { unreachable!() };
 
     *mode = match choice {
-        "hide" => ModeVisibility::Hide,
-        "show" => ModeVisibility::Show,
-        "extended" => ModeVisibility::Extended,
+        "hide" => None,
+        "show" => Some(ModeSection::new(false)),
+        "extended" => Some(ModeSection::new(true)),
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid mode visibility '{v}'"))),
     };
 
@@ -426,10 +428,10 @@ where
     let Some(SubCommand::List(ListArguments { size, .. })) = arguments.command.as_mut() else { unreachable!() };
 
     *size = match choice {
-        "hide" => SizeVisibility::Hide,
-        "simple" => SizeVisibility::Simple,
-        "base-2" => SizeVisibility::Base2,
-        "base-10" => SizeVisibility::Base10,
+        "hide" => None,
+        "simple" => Some(SizeSection::new(SizeVisibility::Simple)),
+        "base-2" => Some(SizeSection::new(SizeVisibility::Base2)),
+        "base-10" => Some(SizeSection::new(SizeVisibility::Base10)),
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid size visibility '{v}'"))),
     };
 
@@ -452,22 +454,20 @@ where
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing time visibility"));
     };
 
-    let choice = match choice {
-        "hide" => TimeVisibility::Hide,
-        "simple" => TimeVisibility::Simple,
-        "iso8601" => TimeVisibility::Iso8601,
-        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid time visibility '{v}'"))),
-    };
-
     let Some(SubCommand::List(ListArguments { created, accessed, modified, .. })) = arguments.command.as_mut() else {
         unreachable!();
     };
 
-    match kind {
-        TimeSectionType::Created => *created = choice,
-        TimeSectionType::Accessed => *accessed = choice,
-        TimeSectionType::Modified => *modified = choice,
-    }
+    *(match kind {
+        TimeSectionType::Created => created,
+        TimeSectionType::Accessed => accessed,
+        TimeSectionType::Modified => modified,
+    }) = match choice {
+        "hide" => None,
+        "simple" => Some(TimeSection::new(TimeVisibility::Simple, kind)),
+        "iso8601" => Some(TimeSection::new(TimeVisibility::Iso8601, kind)),
+        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid time visibility '{v}'"))),
+    };
 
     None
 }
@@ -477,7 +477,7 @@ fn parse_user(arguments: &mut Arguments) -> Option<ParseResult> {
     let Some(command) = arguments.command.as_mut() else { unreachable!() };
 
     match command {
-        SubCommand::List(arguments) => arguments.user = true,
+        SubCommand::List(arguments) => arguments.user = Some(UserSection),
         SubCommand::Tree(_) => unreachable!(),
     }
 
@@ -489,7 +489,7 @@ fn parse_group(arguments: &mut Arguments) -> Option<ParseResult> {
     let Some(command) = arguments.command.as_mut() else { unreachable!() };
 
     match command {
-        SubCommand::List(arguments) => arguments.group = true,
+        SubCommand::List(arguments) => arguments.group = Some(GroupSection),
         SubCommand::Tree(_) => unreachable!(),
     }
 
