@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2025 Jaxydog
+// Copyright © 2025–2026 Jaxydog
 //
 // This file is part of fvr.
 //
