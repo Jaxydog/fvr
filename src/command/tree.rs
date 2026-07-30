@@ -34,22 +34,22 @@ use crate::section::tree::TreeSection;
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
-    let Some(SubCommand::Tree(mut tree_arguments)) = arguments.command else { unreachable!() };
-
-    let sort = tree_arguments.sorting.get_or_insert_default();
-    let filter = recomposition::filter::from_fn(|(path, _)| {
-        (tree_arguments.show_hidden || !is_hidden(path))
-            && tree_arguments.included.as_ref().is_none_or(|include| include.contains(path))
-            && !tree_arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
-    });
+pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
+    let Some(SubCommand::Tree(tree_arguments)) = arguments.command else { unreachable!() };
 
     let tree_section = TreeSection::new(tree_arguments.max_depth.map_or(usize::MAX, NonZero::get));
-    let name_section = NameSection::new(true, tree_arguments.resolve_symlinks);
+    let name_section = NameSection::new(true, arguments.resolve_symlinks);
+
+    let sort = arguments.sort_order.get_or_insert_default();
+    let filter = recomposition::filter::from_fn(|(path, _)| {
+        (arguments.show_hidden || !is_hidden(path))
+            && arguments.included.as_ref().is_none_or(|include| include.contains(path))
+            && !arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
+    });
 
     let f = &mut std::io::stdout().lock();
 
-    let paths = tree_arguments.paths.into_iter().map(|path| {
+    let paths = arguments.paths.into_iter().map(|path| {
         let data = std::fs::symlink_metadata(&path)?;
 
         Ok((path, data))

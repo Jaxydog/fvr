@@ -29,8 +29,20 @@ use crate::arguments::schema::CommandSchema;
 /// The program's command-line arguments.
 #[derive(Default)]
 pub struct Arguments {
+    /// The paths to list.
+    pub paths: Vec<Box<Path>>,
     /// Determines whether to output using color.
     pub color: ColorChoice,
+    /// Whether to show hidden files.
+    pub show_hidden: bool,
+    /// Whether to resolve symbolic links.
+    pub resolve_symlinks: bool,
+    /// The paths to exclude.
+    pub excluded: Option<HashSet<Box<Path>>>,
+    /// The paths to include.
+    pub included: Option<HashSet<Box<Path>>>,
+    /// The preferred sorting order.
+    pub sort_order: Option<SortOrder>,
     /// The program's selected subcommand.
     pub command: Option<SubCommand>,
 }
@@ -142,16 +154,7 @@ impl SubCommand {
 
 /// The program's command-line arguments for the list subcommand.
 #[derive(Default)]
-#[expect(clippy::struct_excessive_bools, reason = "such is the nature of command-line flags")]
 pub struct ListArguments {
-    /// The paths to list.
-    pub paths: Vec<Box<Path>>,
-    /// Whether to show hidden files.
-    pub show_hidden: bool,
-    /// Whether to resolve symbolic links.
-    pub resolve_symlinks: bool,
-    /// The preferred sorting function.
-    pub sorting: Option<SortOrder>,
     /// The preferred mode visibility.
     pub mode: ModeVisibility,
     /// The preferred size visibility.
@@ -166,27 +169,11 @@ pub struct ListArguments {
     pub user: bool,
     /// Whether to show owner groups.
     pub group: bool,
-    /// The paths to exclude.
-    pub excluded: Option<HashSet<Box<Path>>>,
-    /// The paths to include.
-    pub included: Option<HashSet<Box<Path>>>,
 }
 
 /// The program's command-line arguments for the tree subcommand.
 #[derive(Default)]
 pub struct TreeArguments {
-    /// The paths to list.
-    pub paths: Vec<Box<Path>>,
-    /// Whether to show hidden files.
-    pub show_hidden: bool,
-    /// Whether to resolve symbolic links.
-    pub resolve_symlinks: bool,
-    /// The preferred sorting function.
-    pub sorting: Option<SortOrder>,
-    /// The paths to exclude.
-    pub excluded: Option<HashSet<Box<Path>>>,
-    /// The paths to include.
-    pub included: Option<HashSet<Box<Path>>>,
     /// The depth of the search.
     pub max_depth: Option<NonZero<usize>>,
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2025 Jaxydog
+// Copyright © 2025–2026 Jaxydog
 //
 // This file is part of fvr.
 //
@@ -192,16 +192,13 @@ pub fn parse_arguments() -> ParseResult {
         }
     }
 
-    let Some(paths) = arguments.command.as_mut().map(|v| match v {
-        SubCommand::List(arguments) => &mut arguments.paths,
-        SubCommand::Tree(arguments) => &mut arguments.paths,
-    }) else {
+    if arguments.command.is_none() {
         return self::exit_and_print(ERROR_CLI_USAGE, "no subcommand was provided");
-    };
+    }
 
-    if paths.is_empty() {
+    if arguments.paths.is_empty() {
         match std::env::current_dir().and_then(|v| v.canonicalize()) {
-            Ok(path) => paths.push(path.into_boxed_path()),
+            Ok(path) => arguments.paths.push(path.into_boxed_path()),
             Err(error) => return self::exit_and_print(ERROR_GENERIC, error),
         }
     }
@@ -263,13 +260,11 @@ where
 
 /// Parses a single positional command-line argument.
 fn parse_positional(arguments: &mut Arguments, value: &str) -> Option<ParseResult> {
-    if let Some(command) = arguments.command.as_mut() {
-        let (SubCommand::List(ListArguments { paths, .. }) | SubCommand::Tree(TreeArguments { paths, .. })) = command;
-
+    if arguments.command.is_some() {
         match Path::new(value).canonicalize().map(PathBuf::into_boxed_path) {
             Ok(path) => {
-                if !paths.contains(&path) {
-                    paths.push(path);
+                if !arguments.paths.contains(&path) {
+                    arguments.paths.push(path);
                 }
             }
             Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
@@ -331,25 +326,17 @@ where
 }
 
 /// Parses the all command-line argument.
-fn parse_all(arguments: &mut Arguments) -> Option<ParseResult> {
-    let Some(command) = arguments.command.as_mut() else { unreachable!() };
-
-    match command {
-        SubCommand::List(arguments) => arguments.show_hidden = true,
-        SubCommand::Tree(arguments) => arguments.show_hidden = true,
-    }
+#[inline]
+const fn parse_all(arguments: &mut Arguments) -> Option<ParseResult> {
+    arguments.show_hidden = true;
 
     None
 }
 
 /// Parses the resolve-symlinks command-line argument.
-fn parse_resolve_symlinks(arguments: &mut Arguments) -> Option<ParseResult> {
-    let Some(command) = arguments.command.as_mut() else { unreachable!() };
-
-    match command {
-        SubCommand::List(arguments) => arguments.resolve_symlinks = true,
-        SubCommand::Tree(arguments) => arguments.resolve_symlinks = true,
-    }
+#[inline]
+const fn parse_resolve_symlinks(arguments: &mut Arguments) -> Option<ParseResult> {
+    arguments.resolve_symlinks = true;
 
     None
 }
@@ -359,12 +346,6 @@ fn parse_sort<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>)
 where
     I: Iterator<Item = &'p str>,
 {
-    let Some(SubCommand::List(ListArguments { sorting, .. }) | SubCommand::Tree(TreeArguments { sorting, .. })) =
-        arguments.command.as_mut()
-    else {
-        unreachable!();
-    };
-
     let Some(orderings) = (match parser.parse_next_assigned_value() {
         Ok(choice) => choice,
         Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
@@ -372,32 +353,36 @@ where
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing sort order"));
     };
 
-    *sorting = None;
+    let mut sort_order = None::<SortOrder>;
 
     for string in orderings.split(',') {
-        let mut next = match string.trim_start_matches("reverse-") {
-            "name" => SortOrder::Name,
-            "accessed" => SortOrder::Accessed,
-            "created" => SortOrder::Created,
-            "modified" => SortOrder::Modified,
-            "size" => SortOrder::Size,
-            "files" => SortOrder::Files,
-            "symlinks" => SortOrder::Symlinks,
-            "directories" => SortOrder::Directories,
-            "hidden" => SortOrder::Hidden,
-            v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid sort order '{v}'"))),
+        let (string, is_reversed) = string.strip_prefix("reverse-").map_or((string, false), |string| (string, true));
+
+        let Some(next) = (match string {
+            "name" => Some(SortOrder::Name),
+            "accessed" => Some(SortOrder::Accessed),
+            "created" => Some(SortOrder::Created),
+            "modified" => Some(SortOrder::Modified),
+            "size" => Some(SortOrder::Size),
+            "files" => Some(SortOrder::Files),
+            "symlinks" => Some(SortOrder::Symlinks),
+            "directories" => Some(SortOrder::Directories),
+            "hidden" => Some(SortOrder::Hidden),
+            _ => None,
+        }) else {
+            return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid sort order '{string}'")));
         };
 
-        if string.starts_with("reverse-") {
-            next = next.reverse();
-        }
+        let next = if is_reversed { next.reverse() } else { next };
 
-        if let Some(current) = sorting.take().filter(|v| v.top() != &next) {
-            *sorting = Some(current.then(next));
+        if let Some(current) = sort_order.take().filter(|v| v.top() != &next) {
+            sort_order = Some(current.then(next));
         } else {
-            *sorting = Some(next);
+            sort_order = Some(next);
         }
     }
+
+    arguments.sort_order = sort_order;
 
     None
 }
@@ -527,11 +512,7 @@ where
         Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
     };
 
-    match arguments.command.as_mut() {
-        None => unreachable!(),
-        Some(SubCommand::List(arguments)) => arguments.excluded.get_or_insert_default().insert(path),
-        Some(SubCommand::Tree(arguments)) => arguments.excluded.get_or_insert_default().insert(path),
-    };
+    arguments.excluded.get_or_insert_default().insert(path);
 
     None
 }
@@ -552,11 +533,7 @@ where
         Err(error) => return Some(self::exit_and_print(ERROR_GENERIC, error)),
     };
 
-    match arguments.command.as_mut() {
-        None => unreachable!(),
-        Some(SubCommand::List(arguments)) => arguments.included.get_or_insert_default().insert(path),
-        Some(SubCommand::Tree(arguments)) => arguments.included.get_or_insert_default().insert(path),
-    };
+    arguments.included.get_or_insert_default().insert(path);
 
     None
 }

@@ -36,15 +36,8 @@ use crate::section::user::{GroupSection, UserSection};
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
-    let Some(SubCommand::List(mut list_arguments)) = arguments.command else { unreachable!() };
-
-    let sort = list_arguments.sorting.get_or_insert_default();
-    let filter = recomposition::filter::from_fn(|(path, _): &(Box<Path>, _)| {
-        (list_arguments.show_hidden || !is_hidden(path))
-            && list_arguments.included.as_ref().is_none_or(|include| include.contains(path))
-            && !list_arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
-    });
+pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
+    let Some(SubCommand::List(list_arguments)) = arguments.command else { unreachable!() };
 
     let mode_section = if list_arguments.mode.is_hide() {
         None //
@@ -52,7 +45,7 @@ pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
         Some(ModeSection::new(list_arguments.mode.is_extended()))
     };
     let size_section = if list_arguments.size.is_hide() {
-        None // 
+        None //
     } else {
         Some(SizeSection::new(list_arguments.size))
     };
@@ -73,12 +66,17 @@ pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
     };
     let user_section = list_arguments.user.then_some(UserSection);
     let group_section = list_arguments.group.then_some(GroupSection);
-    let name_section = NameSection::new(true, list_arguments.resolve_symlinks);
+    let name_section = NameSection::new(true, arguments.resolve_symlinks);
 
-    let f = &mut std::io::stdout().lock();
+    let sort = arguments.sort_order.get_or_insert_default();
+    let filter = recomposition::filter::from_fn(|(path, _): &(Box<Path>, _)| {
+        (arguments.show_hidden || !is_hidden(path))
+            && arguments.included.as_ref().is_none_or(|include| include.contains(path))
+            && !arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
+    });
 
-    let total_paths = list_arguments.paths.len();
-    let paths = list_arguments.paths.into_iter().map(|path| {
+    let total_paths = arguments.paths.len();
+    let paths = arguments.paths.into_iter().map(|path| {
         let data = std::fs::symlink_metadata(&path)?;
 
         Ok((path, data))
@@ -87,6 +85,8 @@ pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
     let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, Metadata)]>>>()?;
 
     paths.sort_unstable_with(&sort);
+
+    let f = &mut std::io::stdout().lock();
 
     for (index, (path, data)) in paths.into_iter().enumerate() {
         let entry = Entry::new(path, Some(&data), index, total_paths, &filter);
