@@ -16,7 +16,6 @@
 
 //! Implements a section that displays an entry's size.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{Result, StdoutLock};
 use std::path::Path;
@@ -25,9 +24,82 @@ use std::sync::Mutex;
 use recomposition::filter::Filter;
 
 use super::Section;
-use crate::arguments::model::SizeVisibility;
 use crate::files::{Entry, EntryMetadata};
 use crate::{color_bytes, writev};
+
+/// Files above this are considered 'large'.
+const LARGE_THRESHOLD: u64 = 50 * self::units::MEBIBYTES.divisor;
+/// Files above this are considered 'medium'.
+const MEDIUM_THRESHOLD: u64 = 50 * self::units::KIBIBYTES.divisor;
+
+/// The byte that represents a lack of size.
+const UNSIZED_CHARACTER: u8 = b'-';
+/// The byte that represents a decimal.
+const DECIMAL_CHARACTER: u8 = b'.';
+/// The byte used for padding.
+const PADDING_CHARACTER: u8 = b' ';
+
+/// The maximum width of a simple size output.
+const SIMPLE_MAXIMUM_LENGTH: usize = 20;
+/// The array used to pad a simple string.
+const SIMPLE_PADDING: &[u8] = &[PADDING_CHARACTER; SIMPLE_MAXIMUM_LENGTH];
+/// The bytes written when listing the simple size of a directory.
+const SIMPLE_DIRECTORY_BYTES: &[u8] = &[
+    UNSIZED_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+];
+
+/// The maximum width of a base-10 output.
+const BASE_10_MAXIMUM_LENGTH: usize = 8;
+/// The array used to pad a base-10 string.
+const BASE_10_PADDING: &[u8] = &[PADDING_CHARACTER; BASE_10_MAXIMUM_LENGTH];
+/// The bytes written when listing the size of a directory in base-10.
+const BASE_10_DIRECTORY_BYTES: &[u8] = &[
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    UNSIZED_CHARACTER,
+    DECIMAL_CHARACTER,
+    UNSIZED_CHARACTER,
+    PADDING_CHARACTER,
+    UNSIZED_CHARACTER,
+    PADDING_CHARACTER,
+];
+
+/// The maximum width of a base-2 output.
+const BASE_2_MAXIMUM_LENGTH: usize = 10;
+/// The array used to pad a base-2 string.
+const BASE_2_PADDING: &[u8] = &[PADDING_CHARACTER; BASE_2_MAXIMUM_LENGTH];
+/// The bytes written when listing the size of a directory in base-10.
+const BASE_2_DIRECTORY_BYTES: &[u8] = &[
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+    UNSIZED_CHARACTER,
+    DECIMAL_CHARACTER,
+    UNSIZED_CHARACTER,
+    PADDING_CHARACTER,
+    UNSIZED_CHARACTER,
+    PADDING_CHARACTER,
+    PADDING_CHARACTER,
+];
 
 /// Defines human-readable units.
 pub mod units {
@@ -118,40 +190,16 @@ pub mod units {
 
 /// A [`Section`] that writes an entry's size.
 #[derive(Clone, Copy, Debug)]
-pub struct SizeSection {
-    /// Determines the size format to use.
-    pub visibility: SizeVisibility,
+pub enum SizeSection {
+    /// Output the number of bytes.
+    Simple,
+    /// Output the size in base 2.
+    Base2,
+    /// Output the size in base 10.
+    Base10,
 }
 
 impl SizeSection {
-    /// The byte that represents a lack of size.
-    pub const CHAR_BLANK: u8 = b'-';
-    /// The byte that represents a decimal.
-    pub const CHAR_DECIMAL: u8 = b'.';
-    /// The byte used for padding.
-    pub const CHAR_PADDING: u8 = b' ';
-    /// Files above this are considered 'large'.
-    pub const LARGE_THRESHOLD: u64 = 50 * self::units::MEBIBYTES.divisor;
-    /// Files above this are considered 'medium'.
-    pub const MEDIUM_THRESHOLD: u64 = 50 * self::units::KIBIBYTES.divisor;
-    /// The array used to pad a base-10 string.
-    pub const PAD_BASE_10: &[u8] = &[Self::CHAR_PADDING; Self::WIDTH_BASE_10];
-    /// The array used to pad a base-2 string.
-    pub const PAD_BASE_2: &[u8] = &[Self::CHAR_PADDING; Self::WIDTH_BASE_2];
-    /// The width of a base-10 output.
-    pub const WIDTH_BASE_10: usize = 8;
-    /// The width of a base-2 output.
-    pub const WIDTH_BASE_2: usize = 10;
-    /// The width of a simple size output.
-    pub const WIDTH_SIMPLE: usize = 20;
-
-    /// Creates a new [`SizeSection`].
-    #[inline]
-    #[must_use]
-    pub const fn new(visibility: SizeVisibility) -> Self {
-        Self { visibility }
-    }
-
     /// Returns the maximum length that all simple size sections in the given directory will take up.
     #[expect(clippy::unwrap_used, reason = "lock must not be poisoned")]
     fn max_simple_len(parent: &Path) -> usize {
@@ -170,43 +218,9 @@ impl SizeSection {
                             .map(|length| if length == 0 { 0 } else { length.ilog10() + 1 } as usize)
                             .max()
                     })
-                    .unwrap_or(Self::WIDTH_SIMPLE)
+                    .unwrap_or(SIMPLE_MAXIMUM_LENGTH)
             })
         })
-    }
-
-    fn directory_bytes(self, length: usize) -> Cow<'static, [u8]> {
-        const BASE_2: &[u8] = &[
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_BLANK,
-            SizeSection::CHAR_DECIMAL,
-            SizeSection::CHAR_BLANK,
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_BLANK,
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_PADDING,
-        ];
-        const BASE_10: &[u8] = &[
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_BLANK,
-            SizeSection::CHAR_DECIMAL,
-            SizeSection::CHAR_BLANK,
-            SizeSection::CHAR_PADDING,
-            SizeSection::CHAR_BLANK,
-            SizeSection::CHAR_PADDING,
-        ];
-
-        match self.visibility {
-            SizeVisibility::Hide => unreachable!(),
-            SizeVisibility::Simple => {
-                (0 .. length).map(|n| if n == 0 { Self::CHAR_BLANK } else { Self::CHAR_PADDING }).collect()
-            }
-            SizeVisibility::Base2 => Cow::Borrowed(BASE_2),
-            SizeVisibility::Base10 => Cow::Borrowed(BASE_10),
-        }
     }
 }
 
@@ -216,52 +230,59 @@ impl Section for SizeSection {
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
         if entry.is_dir() {
-            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
-            let bytes = self.directory_bytes(length);
+            let bytes = match self {
+                Self::Base2 => BASE_2_DIRECTORY_BYTES,
+                Self::Base10 => BASE_10_DIRECTORY_BYTES,
+                Self::Simple => {
+                    let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+                    let max_simple_length = parent_path.map_or(SIMPLE_MAXIMUM_LENGTH, Self::max_simple_len);
+
+                    &SIMPLE_DIRECTORY_BYTES[.. max_simple_length]
+                }
+            };
 
             return if color { writev!(f, [&bytes] in BrightBlack) } else { writev!(f, [&bytes]) };
         }
 
         let size = entry.data.as_ref().map_or(0, |data| data.size);
 
-        if self.visibility.is_simple() {
+        if matches!(self, Self::Simple) {
             let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
+            let length = parent_path.map_or(SIMPLE_MAXIMUM_LENGTH, Self::max_simple_len);
 
             let mut buffer = itoa::Buffer::new();
             let bytes = buffer.format(size).as_bytes();
 
-            let padding = vec![Self::CHAR_PADDING; length - bytes.len()];
+            let padding = &SIMPLE_PADDING[.. length - bytes.len()];
 
             if !color {
-                return writev!(f, [bytes, &padding]);
+                return writev!(f, [bytes, padding]);
             }
 
             let size_color = match size {
-                v if v < Self::MEDIUM_THRESHOLD => color_bytes!(BrightGreen),
-                v if v < Self::LARGE_THRESHOLD => color_bytes!(BrightYellow),
+                v if v < MEDIUM_THRESHOLD => color_bytes!(BrightGreen),
+                v if v < LARGE_THRESHOLD => color_bytes!(BrightYellow),
                 _ => color_bytes!(BrightRed),
             };
 
-            return writev!(f, [size_color, bytes, color_bytes!(Default), &padding]);
+            return writev!(f, [size_color, bytes, color_bytes!(Default), padding]);
         }
 
-        let (scaled_size, suffix, padding): (f64, &[u8], &[u8]) = if self.visibility.is_base2() {
+        let (scaled_size, suffix, padding): (f64, &[u8], &[u8]) = if matches!(self, Self::Base2) {
             let (scaled_size, unit) = self::units::get_base_2(size);
 
-            (scaled_size, unit.suffix, Self::PAD_BASE_2)
+            (scaled_size, unit.suffix, BASE_2_PADDING)
         } else {
             let (scaled_size, unit) = self::units::get_base_10(size);
 
-            (scaled_size, unit.suffix, Self::PAD_BASE_10)
+            (scaled_size, unit.suffix, BASE_10_PADDING)
         };
 
         let mut buffer = zmij::Buffer::new();
         let bytes = buffer.format(scaled_size).as_bytes();
 
-        let Some((whole, decimal)) = bytes.split_once(|b| *b == Self::CHAR_DECIMAL) else { unreachable!() };
-        let decimal = &[Self::CHAR_DECIMAL, decimal[0], Self::CHAR_PADDING];
+        let Some((whole, decimal)) = bytes.split_once(|b| *b == DECIMAL_CHARACTER) else { unreachable!() };
+        let decimal = &[DECIMAL_CHARACTER, decimal[0], PADDING_CHARACTER];
 
         let padding = &padding[.. padding.len() - (whole.len() + 3 + suffix.len())];
 
@@ -270,8 +291,8 @@ impl Section for SizeSection {
         }
 
         let size_color = match size {
-            v if v < Self::MEDIUM_THRESHOLD => color_bytes!(BrightGreen),
-            v if v < Self::LARGE_THRESHOLD => color_bytes!(BrightYellow),
+            v if v < MEDIUM_THRESHOLD => color_bytes!(BrightGreen),
+            v if v < LARGE_THRESHOLD => color_bytes!(BrightYellow),
             _ => color_bytes!(BrightRed),
         };
 

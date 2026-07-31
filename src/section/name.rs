@@ -26,6 +26,20 @@ use super::Section;
 use crate::files::{Entry, EntryMetadata};
 use crate::{color_bytes, writev};
 
+/// The suffix used for directories.
+const DIRECTORY_SUFFIX: &[u8] = b"/";
+/// The suffix used for executable files.
+const EXECUTABLE_SUFFIX: &[u8] = b"*";
+/// The suffix used for symbolic links.
+const SYMBOLIC_LINK_SUFFIX: &[u8] = b"@";
+
+/// The arrow used when a symbolic link is broken.
+const BROKEN_ARROW: &[u8] = b"-/>";
+/// The arrow used when a symbolic link is valid.
+const LINKED_ARROW: &[u8] = b"-->";
+/// The arrow used when a symbolic link is recursive.
+const RECURSIVE_ARROW: &[u8] = b"<->";
+
 /// A [`Section`] that writes an entry's name.
 #[derive(Clone, Copy, Debug)]
 pub struct NameSection {
@@ -33,22 +47,6 @@ pub struct NameSection {
     pub trim_paths: bool,
     /// Whether to resolve the actual path of symbolic links.
     pub resolve_symlinks: bool,
-}
-
-impl NameSection {
-    /// The suffix used for directories.
-    pub const DIR_SUFFIX: &[u8] = b"/";
-    /// The suffix used for executable files.
-    pub const EXE_SUFFIX: &[u8] = b"*";
-    /// The suffix used for symbolic links.
-    pub const SYMLINK_SUFFIX: &[u8] = b"@";
-
-    /// Creates a new [`NameSection`].
-    #[inline]
-    #[must_use]
-    pub const fn new(trim_paths: bool, resolve_symlinks: bool) -> Self {
-        Self { trim_paths, resolve_symlinks }
-    }
 }
 
 impl Section for NameSection {
@@ -63,11 +61,11 @@ impl Section for NameSection {
         let name = name.as_encoded_bytes();
 
         let suffix = if entry.is_symlink() {
-            Self::SYMLINK_SUFFIX
-        } else if entry.is_dir() && !name.eq_ignore_ascii_case(b"/") {
-            Self::DIR_SUFFIX
+            SYMBOLIC_LINK_SUFFIX
+        } else if entry.is_dir() && name != b"/" {
+            DIRECTORY_SUFFIX
         } else if entry.is_file() && entry.is_executable() {
-            Self::EXE_SUFFIX
+            EXECUTABLE_SUFFIX
         } else {
             &[]
         };
@@ -83,21 +81,21 @@ impl Section for NameSection {
         }
 
         let entry_color = match suffix {
-            Self::SYMLINK_SUFFIX => {
+            SYMBOLIC_LINK_SUFFIX => {
                 if entry.is_hidden() {
                     color_bytes!(Cyan)
                 } else {
                     color_bytes!(BrightCyan)
                 }
             }
-            Self::DIR_SUFFIX => {
+            DIRECTORY_SUFFIX => {
                 if entry.is_hidden() {
                     color_bytes!(Blue)
                 } else {
                     color_bytes!(BrightBlue)
                 }
             }
-            Self::EXE_SUFFIX => {
+            EXECUTABLE_SUFFIX => {
                 if entry.is_hidden() {
                     color_bytes!(Green)
                 } else {
@@ -129,15 +127,6 @@ impl Section for NameSection {
 #[derive(Clone, Copy, Debug)]
 pub struct SymlinkSection;
 
-impl SymlinkSection {
-    /// The arrow used when a symbolic link is broken.
-    pub const BROKEN_ARROW: &[u8] = b"-/>";
-    /// The arrow used when a symbolic link is valid.
-    pub const LINKED_ARROW: &[u8] = b"-->";
-    /// The arrow used when a symbolic link is recursive.
-    pub const RECURSIVE_ARROW: &[u8] = b"<->";
-}
-
 impl Section for SymlinkSection {
     fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
@@ -155,15 +144,15 @@ impl Section for SymlinkSection {
         };
 
         let (data, arrow, arrow_color) = match std::fs::metadata(real_path.as_ref()) {
-            Ok(data) => (Some(EntryMetadata::new(&data)), Self::LINKED_ARROW, color_bytes!(White)),
-            Err(error) if error.kind() == ErrorKind::NotFound => (None, Self::BROKEN_ARROW, color_bytes!(BrightRed)),
+            Ok(data) => (Some(EntryMetadata::new(&data)), LINKED_ARROW, color_bytes!(White)),
+            Err(error) if error.kind() == ErrorKind::NotFound => (None, BROKEN_ARROW, color_bytes!(BrightRed)),
 
             Err(error) if error.kind() != ErrorKind::FilesystemLoop => return Err(error),
             Err(_) => {
                 if color {
-                    writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "] in Cyan)?;
+                    writev!(f, [b" ", RECURSIVE_ARROW, b" "] in Cyan)?;
                 } else {
-                    writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "])?;
+                    writev!(f, [b" ", RECURSIVE_ARROW, b" "])?;
                 }
 
                 let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());

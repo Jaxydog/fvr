@@ -31,11 +31,11 @@ use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
 /// The byte used when the user is missing.
-pub const CHAR_MISSING: u8 = b'-';
+const MISSING_CHARACTER: u8 = b'-';
 /// The byte used for padding.
-pub const CHAR_PADDING: u8 = b' ';
+const PADDING_CHARACTER: u8 = b' ';
 /// The assumed maximum length of a username.
-pub const MAX_LEN: usize = 32;
+const MAXIMUM_LENGTH: usize = 32;
 
 /// A [`Section`] that writes an entry's owner username.
 #[derive(Clone, Copy, Debug)]
@@ -60,22 +60,22 @@ impl UserSection {
         }
 
         CACHE.with(|cache| {
-            if let Some(len) = cache.borrow().get(parent.as_os_str()).copied() {
-                return len;
+            if let Some(length) = cache.borrow().get(parent.as_os_str()).copied() {
+                return length;
             }
 
-            let len = std::fs::read_dir(parent)
+            let length = std::fs::read_dir(parent)
                 .ok()
                 .and_then(|v| {
                     v.map_while(|v| v.and_then(|v| v.metadata()).ok())
                         .map_while(|v| Self::name(v.uid()).map(|v| v.len()))
                         .max()
                 })
-                .unwrap_or(MAX_LEN);
+                .unwrap_or(MAXIMUM_LENGTH);
 
-            cache.borrow_mut().insert(Box::from(parent.as_os_str()), len);
+            cache.borrow_mut().insert(Box::from(parent.as_os_str()), length);
 
-            len
+            length
         })
     }
 }
@@ -86,17 +86,17 @@ impl Section for UserSection {
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-        let length = parent_path.map_or(MAX_LEN, Self::max_len);
+        let length = parent_path.map_or(MAXIMUM_LENGTH, Self::max_len);
 
         let Some(user) = entry.data.as_ref().and_then(|data| Self::name(data.uid)) else {
             return if color {
-                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack)
+                writev!(f, [&[MISSING_CHARACTER], &vec![b' '; length - 1]] in BrightBlack)
             } else {
-                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]])
+                writev!(f, [&[MISSING_CHARACTER], &vec![b' '; length - 1]])
             };
         };
 
-        let padding = vec![CHAR_PADDING; length.saturating_sub(user.len())];
+        let padding = vec![PADDING_CHARACTER; length.saturating_sub(user.len())];
 
         if color {
             writev!(f, [user.as_encoded_bytes(), &padding] in BrightGreen)
@@ -129,22 +129,22 @@ impl GroupSection {
         }
 
         CACHE.with(|cache| {
-            if let Some(len) = cache.borrow().get(parent.as_os_str()).copied() {
-                return len;
+            if let Some(length) = cache.borrow().get(parent.as_os_str()).copied() {
+                return length;
             }
 
-            let len = std::fs::read_dir(parent)
+            let length = std::fs::read_dir(parent)
                 .ok()
                 .and_then(|v| {
                     v.map_while(|v| v.and_then(|v| v.metadata()).ok())
                         .map_while(|v| Self::name(v.gid()).map(|v| v.len()))
                         .max()
                 })
-                .unwrap_or(MAX_LEN);
+                .unwrap_or(MAXIMUM_LENGTH);
 
-            cache.borrow_mut().insert(Box::from(parent.as_os_str()), len);
+            cache.borrow_mut().insert(Box::from(parent.as_os_str()), length);
 
-            len
+            length
         })
     }
 }
@@ -155,17 +155,17 @@ impl Section for GroupSection {
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-        let length = parent_path.map_or(MAX_LEN, Self::max_len);
+        let length = parent_path.map_or(MAXIMUM_LENGTH, Self::max_len);
 
         let Some(group) = entry.data.as_ref().and_then(|data| Self::name(data.gid)) else {
             return if color {
-                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack)
+                writev!(f, [&[MISSING_CHARACTER], &vec![b' '; length - 1]] in BrightBlack)
             } else {
-                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]])
+                writev!(f, [&[MISSING_CHARACTER], &vec![b' '; length - 1]])
             };
         };
 
-        let padding = vec![CHAR_PADDING; length.saturating_sub(group.len())];
+        let padding = vec![PADDING_CHARACTER; length.saturating_sub(group.len())];
 
         if color {
             writev!(f, [group.as_encoded_bytes(), &padding] in BrightYellow)

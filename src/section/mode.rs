@@ -25,6 +25,37 @@ use super::Section;
 use crate::files::{Entry, EntryMetadata, Filetype, Permissions};
 use crate::{color_bytes, writev};
 
+/// The byte used to represent a block device.
+const FILETYPE_FLAG_BLOCK_DEVICE: u8 = b'b';
+/// The byte used to represent a character device.
+const FILETYPE_FLAG_CHARACTER_DEVICE: u8 = b'c';
+/// The byte used to represent a directory.
+const FILETYPE_FLAG_DIRECTORY: u8 = b'd';
+/// The byte used to represent a pipe.
+const FILETYPE_FLAG_FIFO_PIPE: u8 = b'p';
+/// The byte used to represent a file.
+const FILETYPE_FLAG_FILE: u8 = b'-';
+/// The byte used to represent a socket.
+const FILETYPE_FLAG_SOCKET: u8 = b's';
+/// The byte used to represent a symbolic link.
+const FILETYPE_FLAG_SYMBOLIC_LINK: u8 = b'l';
+/// The byte used to represent an unknown filetype.
+const FILETYPE_FLAG_UNKNOWN: u8 = b'?';
+/// The byte used to represent an empty permission.
+const PERMISSION_FLAG_EMPTY: u8 = b'-';
+/// The byte used to represent an execute permission.
+const PERMISSION_FLAG_EXECUTE: u8 = b'x';
+/// The byte used to represent a read permission.
+const PERMISSION_FLAG_READ: u8 = b'r';
+/// The byte used to represent a `setgid` permission.
+const PERMISSION_FLAG_SETGID: u8 = b'g';
+/// The byte used to represent a `setuid` permission.
+const PERMISSION_FLAG_SETUID: u8 = b'u';
+/// The byte used to represent a read permission.
+const PERMISSION_FLAG_STICKY: u8 = b's';
+/// The byte used to represent a write permission.
+const PERMISSION_FLAG_WRITE: u8 = b'w';
+
 /// A [`Section`] that writes an entry's filetype and permissions.
 #[derive(Clone, Copy, Debug)]
 pub struct ModeSection {
@@ -33,44 +64,6 @@ pub struct ModeSection {
 }
 
 impl ModeSection {
-    /// The byte used to represent an empty permission.
-    pub const PERM_EMPTY: u8 = b'-';
-    /// The byte used to represent an execute permission.
-    pub const PERM_EXECUTE: u8 = b'x';
-    /// The byte used to represent a read permission.
-    pub const PERM_READ: u8 = b'r';
-    /// The byte used to represent a `setgid` permission.
-    pub const PERM_SETGID: u8 = b'g';
-    /// The byte used to represent a `setuid` permission.
-    pub const PERM_SETUID: u8 = b'u';
-    /// The byte used to represent a read permission.
-    pub const PERM_STICKY: u8 = b's';
-    /// The byte used to represent a write permission.
-    pub const PERM_WRITE: u8 = b'w';
-    /// The byte used to represent a block device.
-    pub const TYPE_BLOCK_DEVICE: u8 = b'b';
-    /// The byte used to represent a character device.
-    pub const TYPE_CHARACTER_DEVICE: u8 = b'c';
-    /// The byte used to represent a directory.
-    pub const TYPE_DIRECTORY: u8 = b'd';
-    /// The byte used to represent a pipe.
-    pub const TYPE_FIFO_PIPE: u8 = b'p';
-    /// The byte used to represent a file.
-    pub const TYPE_FILE: u8 = b'-';
-    /// The byte used to represent a socket.
-    pub const TYPE_SOCKET: u8 = b's';
-    /// The byte used to represent a symbolic link.
-    pub const TYPE_SYMBOLIC_LINK: u8 = b'l';
-    /// The byte used to represent an unknown filetype.
-    pub const TYPE_UNKNOWN: u8 = b'?';
-
-    /// Creates a new [`ModeSection`].
-    #[inline]
-    #[must_use]
-    pub const fn new(extended: bool) -> Self {
-        Self { extended }
-    }
-
     /// Returns the ASCII flag character for the filetype.
     const fn get_filetype_flag(filetype: Filetype) -> u8 {
         use crate::files::{
@@ -79,14 +72,14 @@ impl ModeSection {
         };
 
         match filetype.get() {
-            FILETYPE_FILE => Self::TYPE_FILE,
-            FILETYPE_DIRECTORY => Self::TYPE_DIRECTORY,
-            FILETYPE_SYMBOLIC_LINK => Self::TYPE_SYMBOLIC_LINK,
-            FILETYPE_FIFO_PIPE => Self::TYPE_FIFO_PIPE,
-            FILETYPE_SOCKET => Self::TYPE_SOCKET,
-            FILETYPE_BLOCK_DEVICE => Self::TYPE_BLOCK_DEVICE,
-            FILETYPE_CHARACTER_DEVICE => Self::TYPE_CHARACTER_DEVICE,
-            _ => Self::TYPE_UNKNOWN,
+            FILETYPE_FILE => FILETYPE_FLAG_FILE,
+            FILETYPE_DIRECTORY => FILETYPE_FLAG_DIRECTORY,
+            FILETYPE_SYMBOLIC_LINK => FILETYPE_FLAG_SYMBOLIC_LINK,
+            FILETYPE_FIFO_PIPE => FILETYPE_FLAG_FIFO_PIPE,
+            FILETYPE_SOCKET => FILETYPE_FLAG_SOCKET,
+            FILETYPE_BLOCK_DEVICE => FILETYPE_FLAG_BLOCK_DEVICE,
+            FILETYPE_CHARACTER_DEVICE => FILETYPE_FLAG_CHARACTER_DEVICE,
+            _ => FILETYPE_FLAG_UNKNOWN,
         }
     }
 
@@ -98,18 +91,18 @@ impl ModeSection {
         };
 
         [
-            if permissions.has_extra(PERMISSION_SET_UID) { Self::PERM_SETUID } else { Self::PERM_EMPTY },
-            if permissions.has_extra(PERMISSION_SET_GID) { Self::PERM_SETGID } else { Self::PERM_EMPTY },
-            if permissions.has_extra(PERMISSION_STICKY) { Self::PERM_STICKY } else { Self::PERM_EMPTY },
-            if permissions.has_owner(PERMISSION_READ) { Self::PERM_READ } else { Self::PERM_EMPTY },
-            if permissions.has_owner(PERMISSION_WRITE) { Self::PERM_WRITE } else { Self::PERM_EMPTY },
-            if permissions.has_owner(PERMISSION_EXECUTE) { Self::PERM_EXECUTE } else { Self::PERM_EMPTY },
-            if permissions.has_group(PERMISSION_READ) { Self::PERM_READ } else { Self::PERM_EMPTY },
-            if permissions.has_group(PERMISSION_WRITE) { Self::PERM_WRITE } else { Self::PERM_EMPTY },
-            if permissions.has_group(PERMISSION_EXECUTE) { Self::PERM_EXECUTE } else { Self::PERM_EMPTY },
-            if permissions.has_other(PERMISSION_READ) { Self::PERM_READ } else { Self::PERM_EMPTY },
-            if permissions.has_other(PERMISSION_WRITE) { Self::PERM_WRITE } else { Self::PERM_EMPTY },
-            if permissions.has_other(PERMISSION_EXECUTE) { Self::PERM_EXECUTE } else { Self::PERM_EMPTY },
+            if permissions.has_extra(PERMISSION_SET_UID) { PERMISSION_FLAG_SETUID } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_extra(PERMISSION_SET_GID) { PERMISSION_FLAG_SETGID } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_extra(PERMISSION_STICKY) { PERMISSION_FLAG_STICKY } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_owner(PERMISSION_READ) { PERMISSION_FLAG_READ } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_owner(PERMISSION_WRITE) { PERMISSION_FLAG_WRITE } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_owner(PERMISSION_EXECUTE) { PERMISSION_FLAG_EXECUTE } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_group(PERMISSION_READ) { PERMISSION_FLAG_READ } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_group(PERMISSION_WRITE) { PERMISSION_FLAG_WRITE } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_group(PERMISSION_EXECUTE) { PERMISSION_FLAG_EXECUTE } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_other(PERMISSION_READ) { PERMISSION_FLAG_READ } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_other(PERMISSION_WRITE) { PERMISSION_FLAG_WRITE } else { PERMISSION_FLAG_EMPTY },
+            if permissions.has_other(PERMISSION_EXECUTE) { PERMISSION_FLAG_EXECUTE } else { PERMISSION_FLAG_EMPTY },
         ]
     }
 }
@@ -119,47 +112,44 @@ impl Section for ModeSection {
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
-        let filetype = entry.data.as_ref().map_or_default(EntryMetadata::filetype);
-        let filetype = Self::get_filetype_flag(filetype);
-
-        let permissions = entry.data.as_ref().map_or_default(EntryMetadata::permissions);
-        let permissions = Self::get_permission_flags(permissions);
+        let filetype = Self::get_filetype_flag(entry.data.as_ref().map_or_default(EntryMetadata::filetype));
+        let permissions = Self::get_permission_flags(entry.data.as_ref().map_or_default(EntryMetadata::permissions));
         let permissions = if self.extended { &permissions } else { &permissions[3 ..] };
 
         if !color {
             return writev!(f, [&[b'[', filetype], permissions, b"]"]);
         }
 
-        let mut buffer = Vec::<u8>::with_capacity((permissions.len() + 1) * 6);
+        let mut flag_buffer = Vec::with_capacity((permissions.len() + 1) * 6);
 
-        buffer.extend_from_slice(match filetype {
-            Self::TYPE_DIRECTORY => color_bytes!(BrightBlue),
-            Self::TYPE_SYMBOLIC_LINK => color_bytes!(BrightCyan),
-            Self::TYPE_FIFO_PIPE => color_bytes!(BrightYellow),
-            Self::TYPE_SOCKET => color_bytes!(BrightGreen),
-            Self::TYPE_BLOCK_DEVICE => color_bytes!(BrightRed),
-            Self::TYPE_CHARACTER_DEVICE => color_bytes!(BrightMagenta),
-            Self::TYPE_FILE | Self::TYPE_UNKNOWN => color_bytes!(BrightBlack),
+        flag_buffer.extend_from_slice(match filetype {
+            FILETYPE_FLAG_DIRECTORY => color_bytes!(BrightBlue),
+            FILETYPE_FLAG_SYMBOLIC_LINK => color_bytes!(BrightCyan),
+            FILETYPE_FLAG_FIFO_PIPE => color_bytes!(BrightYellow),
+            FILETYPE_FLAG_SOCKET => color_bytes!(BrightGreen),
+            FILETYPE_FLAG_BLOCK_DEVICE => color_bytes!(BrightRed),
+            FILETYPE_FLAG_CHARACTER_DEVICE => color_bytes!(BrightMagenta),
+            FILETYPE_FLAG_FILE | FILETYPE_FLAG_UNKNOWN => color_bytes!(BrightBlack),
             _ => unreachable!(),
         });
 
-        buffer.push(filetype);
+        flag_buffer.push(filetype);
 
         for permission in permissions {
-            buffer.extend_from_slice(match *permission {
-                Self::PERM_EMPTY => color_bytes!(BrightBlack),
-                Self::PERM_READ => color_bytes!(BrightYellow),
-                Self::PERM_WRITE => color_bytes!(BrightRed),
-                Self::PERM_EXECUTE => color_bytes!(BrightGreen),
-                Self::PERM_SETGID => color_bytes!(BrightCyan),
-                Self::PERM_SETUID => color_bytes!(BrightBlue),
-                Self::PERM_STICKY => color_bytes!(BrightMagenta),
+            flag_buffer.extend_from_slice(match *permission {
+                PERMISSION_FLAG_EMPTY => color_bytes!(BrightBlack),
+                PERMISSION_FLAG_READ => color_bytes!(BrightYellow),
+                PERMISSION_FLAG_WRITE => color_bytes!(BrightRed),
+                PERMISSION_FLAG_EXECUTE => color_bytes!(BrightGreen),
+                PERMISSION_FLAG_SETGID => color_bytes!(BrightCyan),
+                PERMISSION_FLAG_SETUID => color_bytes!(BrightBlue),
+                PERMISSION_FLAG_STICKY => color_bytes!(BrightMagenta),
                 _ => unreachable!(),
             });
 
-            buffer.push(*permission);
+            flag_buffer.push(*permission);
         }
 
-        writev!(f, [color_bytes!(White), b"[", &buffer, color_bytes!(White), b"]", color_bytes!(Default)])
+        writev!(f, [color_bytes!(White), b"[", &flag_buffer, color_bytes!(White), b"]", color_bytes!(Default)])
     }
 }

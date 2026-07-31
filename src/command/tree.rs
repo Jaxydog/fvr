@@ -23,7 +23,7 @@ use std::path::Path;
 use recomposition::sort::ListSortExt;
 
 use crate::arguments::model::{Arguments, SubCommand};
-use crate::files::{Entry, EntryMetadata, is_hidden};
+use crate::files::{Entry, EntryMetadata};
 use crate::section::Section;
 use crate::section::name::NameSection;
 use crate::section::tree::TreeSection;
@@ -36,12 +36,12 @@ use crate::section::tree::TreeSection;
 pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command else { unreachable!() };
 
-    let tree_section = TreeSection::new(tree_arguments.max_depth.map_or(usize::MAX, NonZero::get));
-    let name_section = NameSection::new(true, arguments.resolve_symlinks);
+    let tree_section = TreeSection { max_depth: tree_arguments.max_depth.map_or(usize::MAX, NonZero::get) };
+    let name_section = NameSection { trim_paths: true, resolve_symlinks: arguments.resolve_symlinks };
 
     let sort = arguments.sort_order.get_or_insert_default();
     let filter = recomposition::filter::from_fn(|(path, _)| {
-        (arguments.show_hidden || !is_hidden(path))
+        (arguments.show_hidden || !crate::files::is_hidden(path))
             && arguments.included.as_ref().is_none_or(|include| include.contains(path))
             && !arguments.excluded.as_ref().is_some_and(|exclude| exclude.contains(path))
     });

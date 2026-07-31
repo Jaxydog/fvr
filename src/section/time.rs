@@ -25,32 +25,48 @@ use time::format_description::well_known::Iso8601;
 use time::{OffsetDateTime, SignedDuration, UtcOffset};
 
 use super::Section;
-use crate::arguments::model::TimeVisibility;
 use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
 /// The byte used when the creation date cannot be determined.
-pub const CHAR_MISSING: u8 = b'-';
+const MISSING_CHARACTER: u8 = b'-';
 /// The byte used for padding.
-pub const CHAR_PADDING: u8 = b' ';
+const PADDING_CHARACTER: u8 = b' ';
+
 /// The size of a simple timestamp.
-pub const SIZE_SIMPLE: usize = 15;
-/// The size of an ISO-8601 timestamp.
-pub const SIZE_ISO_8601: usize = 34;
-/// The format used to print simple dates.
-pub const SIMPLE_FORMAT: &[BorrowedFormatItem<'static>] = time::macros::format_description!(
+const SIMPLE_LENGTH: usize = 15;
+/// The padding required to fill the length of a simple timestamp.
+const SIMPLE_PADDING: &[u8] = &[PADDING_CHARACTER; SIMPLE_LENGTH];
+/// The format used to print simple timestamps.
+const SIMPLE_FORMAT: &[BorrowedFormatItem<'static>] = time::macros::format_description!(
     version = 2,
     "[day padding:space] [month repr:short] '[year repr:last_two] [hour padding:space repr:24]:[minute padding:zero]"
 );
 
+/// The size of an ISO-8601 timestamp.
+const ISO_8601_LENGTH: usize = 34;
+/// The padding required to fill the length of an ISO-8601 timestamp.
+const ISO_8601_PADDING: &[u8] = &[PADDING_CHARACTER; ISO_8601_LENGTH];
+/// The format used to print simple ISO-8601 timestamps.
+const ISO_8601_FORMAT: &Iso8601 = &Iso8601::DEFAULT;
+
 thread_local! {
     /// Caches the system's offset to save repeated computation.
-    static OFFSET: UtcOffset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
+    static LOCAL_OFFSET: UtcOffset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
+}
+
+/// Determines how timestamps are displayed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    /// Display in a simple format.
+    Simple,
+    /// Display in ISO-8601 format.
+    Iso8601,
 }
 
 /// Determines what type of time section is shown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TimeSectionType {
+pub enum Kind {
     /// Created timestamp.
     Created,
     /// Accessed timestamp.
@@ -62,40 +78,10 @@ pub enum TimeSectionType {
 /// A [`Section`] that writes an entry's extracted date.
 #[derive(Clone, Copy, Debug)]
 pub struct TimeSection {
-    /// Determines how the date is rendered.
-    pub visibility: TimeVisibility,
     /// The time section type.
-    pub kind: TimeSectionType,
-}
-
-impl TimeSection {
-    /// Creates a new [`TimeSection`].
-    #[inline]
-    #[must_use]
-    pub const fn new(visibility: TimeVisibility, kind: TimeSectionType) -> Self {
-        Self { visibility, kind }
-    }
-
-    /// Creates a new [`TimeSection`] for a creation date timestamp.
-    #[inline]
-    #[must_use]
-    pub const fn created(visibility: TimeVisibility) -> Self {
-        Self::new(visibility, TimeSectionType::Created)
-    }
-
-    /// Creates a new [`TimeSection`] for an access date timestamp.
-    #[inline]
-    #[must_use]
-    pub const fn accessed(visibility: TimeVisibility) -> Self {
-        Self::new(visibility, TimeSectionType::Accessed)
-    }
-
-    /// Creates a new [`TimeSection`] for a modification date timestamp.
-    #[inline]
-    #[must_use]
-    pub const fn modified(visibility: TimeVisibility) -> Self {
-        Self::new(visibility, TimeSectionType::Modified)
-    }
+    pub kind: Kind,
+    /// Determines how the date is rendered.
+    pub format: Format,
 }
 
 impl Section for TimeSection {
@@ -104,30 +90,27 @@ impl Section for TimeSection {
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let Some(timestamp_seconds) = entry.data.as_ref().map(|data| match self.kind {
-            TimeSectionType::Created => data.ctime,
-            TimeSectionType::Accessed => data.atime,
-            TimeSectionType::Modified => data.mtime,
+            Kind::Created => data.ctime,
+            Kind::Accessed => data.atime,
+            Kind::Modified => data.mtime,
         }) else {
-            const PADDING_SIMPLE: &[u8] = &[CHAR_PADDING; SIZE_SIMPLE];
-            const PADDING_ISO_8601: &[u8] = &[CHAR_PADDING; SIZE_ISO_8601];
-
-            let padding = if self.visibility.is_simple() { PADDING_SIMPLE } else { PADDING_ISO_8601 };
+            let padding = if matches!(self.format, Format::Simple) { SIMPLE_PADDING } else { ISO_8601_PADDING };
 
             return if color {
-                writev!(f, [&[CHAR_MISSING], padding] in BrightBlack)
+                writev!(f, [&[MISSING_CHARACTER], padding] in BrightBlack)
             } else {
-                writev!(f, [&[CHAR_MISSING], padding])
+                writev!(f, [&[MISSING_CHARACTER], padding])
             };
         };
 
-        let timestamp = OFFSET.with(|offset| {
+        let timestamp = LOCAL_OFFSET.with(|offset| {
             (OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(timestamp_seconds)).to_offset(*offset)
         });
 
-        let Ok(formatted) = (if self.visibility.is_simple() {
+        let Ok(formatted) = (if matches!(self.format, Format::Simple) {
             timestamp.format(SIMPLE_FORMAT)
         } else {
-            timestamp.format(&Iso8601::DEFAULT)
+            timestamp.format(ISO_8601_FORMAT)
         }) else {
             unreachable!("timestamp format must be valid")
         };
@@ -137,9 +120,9 @@ impl Section for TimeSection {
         }
 
         match self.kind {
-            TimeSectionType::Created => writev!(f, [formatted.as_bytes()] in BrightGreen),
-            TimeSectionType::Accessed => writev!(f, [formatted.as_bytes()] in BrightCyan),
-            TimeSectionType::Modified => writev!(f, [formatted.as_bytes()] in BrightBlue),
+            Kind::Created => writev!(f, [formatted.as_bytes()] in BrightGreen),
+            Kind::Accessed => writev!(f, [formatted.as_bytes()] in BrightCyan),
+            Kind::Modified => writev!(f, [formatted.as_bytes()] in BrightBlue),
         }
     }
 }

@@ -62,36 +62,13 @@ pub enum ColorChoice {
 }
 
 impl ColorChoice {
-    /// Returns `true` if the color choice is [`Auto`].
-    ///
-    /// [`Auto`]: ColorChoice::Auto
-    #[must_use]
-    pub const fn is_auto(self) -> bool {
-        matches!(self, Self::Auto)
-    }
-
-    /// Returns `true` if the color choice is [`Always`].
-    ///
-    /// [`Always`]: ColorChoice::Always
-    #[must_use]
-    pub const fn is_always(self) -> bool {
-        matches!(self, Self::Always)
-    }
-
-    /// Returns `true` if the color choice is [`Never`].
-    ///
-    /// [`Never`]: ColorChoice::Never
-    #[must_use]
-    pub const fn is_never(self) -> bool {
-        matches!(self, Self::Never)
-    }
-
     /// Returns whether or not color should be enabled.
     #[must_use]
     pub fn should_be_enabled(self) -> bool {
-        use supports_color::Stream;
+        use supports_color::Stream::Stdout;
+        use supports_color::on_cached;
 
-        self.is_always() || (self.is_auto() && supports_color::on_cached(Stream::Stdout).is_some_and(|v| v.has_basic))
+        matches!(self, Self::Always) || (matches!(self, Self::Auto) && on_cached(Stdout).is_some_and(|v| v.has_basic))
     }
 }
 
@@ -230,91 +207,5 @@ impl Sort<(Box<Path>, EntryMetadata)> for SortOrder {
 impl Default for SortOrder {
     fn default() -> Self {
         Self::Directories.then(Self::Files).then(Self::Name)
-    }
-}
-
-/// Determines whether to display file sizes.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SizeVisibility {
-    /// Files sizes are not rendered.
-    #[default]
-    Hide,
-    /// Output the number of bytes.
-    Simple,
-    /// Output the size in base 2.
-    Base2,
-    /// Output the size in base 10.
-    Base10,
-}
-
-impl SizeVisibility {
-    /// Returns `true` if the size visibility is [`Hide`].
-    ///
-    /// [`Hide`]: SizeVisibility::Hide
-    #[must_use]
-    pub const fn is_hide(self) -> bool {
-        matches!(self, Self::Hide)
-    }
-
-    /// Returns `true` if the size visibility is [`Simple`].
-    ///
-    /// [`Simple`]: SizeVisibility::Simple
-    #[must_use]
-    pub const fn is_simple(self) -> bool {
-        matches!(self, Self::Simple)
-    }
-
-    /// Returns `true` if the size visibility is [`Base2`].
-    ///
-    /// [`Base2`]: SizeVisibility::Base2
-    #[must_use]
-    pub const fn is_base2(self) -> bool {
-        matches!(self, Self::Base2)
-    }
-
-    /// Returns `true` if the size visibility is [`Base10`].
-    ///
-    /// [`Base10`]: SizeVisibility::Base10
-    #[must_use]
-    pub const fn is_base10(self) -> bool {
-        matches!(self, Self::Base10)
-    }
-}
-
-/// Determines whether to display dates.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum TimeVisibility {
-    /// Dates are not rendered.
-    #[default]
-    Hide,
-    /// Display in a simple format.
-    Simple,
-    /// Display in ISO-8601 format.
-    Iso8601,
-}
-
-impl TimeVisibility {
-    /// Returns `true` if the time visibility is [`Hide`].
-    ///
-    /// [`Hide`]: TimeVisibility::Hide
-    #[must_use]
-    pub const fn is_hide(self) -> bool {
-        matches!(self, Self::Hide)
-    }
-
-    /// Returns `true` if the time visibility is [`Simple`].
-    ///
-    /// [`Simple`]: TimeVisibility::Simple
-    #[must_use]
-    pub const fn is_simple(self) -> bool {
-        matches!(self, Self::Simple)
-    }
-
-    /// Returns `true` if the time visibility is [`Iso8601`].
-    ///
-    /// [`Iso8601`]: TimeVisibility::Iso8601
-    #[must_use]
-    pub const fn is_iso8601(self) -> bool {
-        matches!(self, Self::Iso8601)
     }
 }

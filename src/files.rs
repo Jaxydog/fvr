@@ -119,13 +119,6 @@ where
         self.total == (self.index + 1)
     }
 
-    /// Returns the number of entries remaining after this entry.
-    #[inline]
-    #[must_use]
-    pub const fn remaining(&self) -> usize {
-        self.total - (self.index + 1)
-    }
-
     /// Returns `true` if this entry represents a directory.
     #[inline]
     pub fn is_dir(&self) -> bool {
@@ -155,7 +148,7 @@ where
     #[inline]
     #[must_use]
     pub fn is_hidden(&self) -> bool {
-        self.path.file_name().and_then(|v| v.as_bytes().first()).copied().is_some_and(|v| v == b'.')
+        self::is_hidden(&self.path)
     }
 
     /// Returns `true` if this entry can be traversed like a directory.
@@ -252,13 +245,6 @@ impl Filetype {
         self.get() == kind
     }
 
-    /// Returns whether this mode is a socket.
-    #[inline]
-    #[must_use]
-    pub const fn is_socket(self) -> bool {
-        self.has(self::FILETYPE_SOCKET)
-    }
-
     /// Returns whether this mode is a symbolic link.
     #[inline]
     #[must_use]
@@ -273,32 +259,11 @@ impl Filetype {
         self.has(self::FILETYPE_FILE)
     }
 
-    /// Returns whether this mode is a block device.
-    #[inline]
-    #[must_use]
-    pub const fn is_block_device(self) -> bool {
-        self.has(self::FILETYPE_BLOCK_DEVICE)
-    }
-
     /// Returns whether this mode is a directory.
     #[inline]
     #[must_use]
     pub const fn is_directory(self) -> bool {
         self.has(self::FILETYPE_DIRECTORY)
-    }
-
-    /// Returns whether this mode is a character device.
-    #[inline]
-    #[must_use]
-    pub const fn is_character_device(self) -> bool {
-        self.has(self::FILETYPE_CHARACTER_DEVICE)
-    }
-
-    /// Returns whether this mode is a FIFO pipe.
-    #[inline]
-    #[must_use]
-    pub const fn is_fifo_pipe(self) -> bool {
-        self.has(self::FILETYPE_SOCKET)
     }
 }
 

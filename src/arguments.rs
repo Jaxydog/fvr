@@ -22,13 +22,11 @@ use std::path::{Path, PathBuf};
 
 use carp::{ArgumentOrPositional, Parser};
 
-use self::model::{
-    Arguments, ColorChoice, ListArguments, SizeVisibility, SortOrder, SubCommand, TimeVisibility, TreeArguments,
-};
+use self::model::{Arguments, ColorChoice, ListArguments, SortOrder, SubCommand, TreeArguments};
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 use crate::section::mode::ModeSection;
 use crate::section::size::SizeSection;
-use crate::section::time::{TimeSection, TimeSectionType};
+use crate::section::time::{Format as TimeFormat, Kind as TimeKind, TimeSection};
 use crate::section::user::{GroupSection, UserSection};
 
 pub mod model;
@@ -184,13 +182,13 @@ where
         }
 
         Argument(Long("created")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_time(arguments, parser, TimeSectionType::Created)
+            self::parse_time(arguments, parser, TimeKind::Created)
         }
         Argument(Long("accessed")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_time(arguments, parser, TimeSectionType::Accessed)
+            self::parse_time(arguments, parser, TimeKind::Accessed)
         }
         Argument(Long("modified")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_time(arguments, parser, TimeSectionType::Modified)
+            self::parse_time(arguments, parser, TimeKind::Modified)
         }
 
         Argument(Short('u') | Long("user")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
@@ -315,8 +313,8 @@ where
 
     *mode = match choice {
         "hide" => None,
-        "show" => Some(ModeSection::new(false)),
-        "extended" => Some(ModeSection::new(true)),
+        "show" => Some(ModeSection { extended: false }),
+        "extended" => Some(ModeSection { extended: true }),
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid mode visibility '{v}'"))),
     };
 
@@ -339,9 +337,9 @@ where
 
     *size = match choice {
         "hide" => None,
-        "simple" => Some(SizeSection::new(SizeVisibility::Simple)),
-        "base-2" => Some(SizeSection::new(SizeVisibility::Base2)),
-        "base-10" => Some(SizeSection::new(SizeVisibility::Base10)),
+        "simple" => Some(SizeSection::Simple),
+        "base-2" => Some(SizeSection::Base2),
+        "base-10" => Some(SizeSection::Base10),
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid size visibility '{v}'"))),
     };
 
@@ -349,11 +347,7 @@ where
 }
 
 /// Parses the created, accessed, and/or modified command-line argument.
-fn parse_time<'p, I>(
-    arguments: &mut Arguments,
-    parser: &mut Parser<&'p str, I>,
-    kind: TimeSectionType,
-) -> Option<ParseResult>
+fn parse_time<'p, I>(arguments: &mut Arguments, parser: &mut Parser<&'p str, I>, kind: TimeKind) -> Option<ParseResult>
 where
     I: Iterator<Item = &'p str>,
 {
@@ -369,13 +363,13 @@ where
     };
 
     *(match kind {
-        TimeSectionType::Created => created,
-        TimeSectionType::Accessed => accessed,
-        TimeSectionType::Modified => modified,
+        TimeKind::Created => created,
+        TimeKind::Accessed => accessed,
+        TimeKind::Modified => modified,
     }) = match choice {
         "hide" => None,
-        "simple" => Some(TimeSection::new(TimeVisibility::Simple, kind)),
-        "iso8601" => Some(TimeSection::new(TimeVisibility::Iso8601, kind)),
+        "simple" => Some(TimeSection { kind, format: TimeFormat::Simple }),
+        "iso8601" => Some(TimeSection { kind, format: TimeFormat::Iso8601 }),
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid time visibility '{v}'"))),
     };
 

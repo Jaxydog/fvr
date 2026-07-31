@@ -25,34 +25,26 @@ use super::Section;
 use crate::files::{Entry, EntryMetadata};
 use crate::writev;
 
+/// The bytes used for padding.
+const PADDING_CHARACTER: &[u8] = b" ";
+/// The bytes used for a horizontal line.
+const HORIZONTAL_CHARACTER: &[u8] = "─".as_bytes();
+/// The bytes used for a horizontal split line.
+const HORIZONTAL_BRANCH_CHARACTER: &[u8] = "┬".as_bytes();
+/// The bytes used for a vertical line.
+const VERTICAL_CHARACTER: &[u8] = "│".as_bytes();
+/// The bytes used for a vertical split line.
+const VERTICAL_BRANCH_CHARACTER: &[u8] = "├".as_bytes();
+/// The bytes used for a top corner.
+const VERTICAL_START_CHARACTER: &[u8] = "┌".as_bytes();
+/// The bytes used for a bottom corner.
+const VERTICAL_FINAL_CHARACTER: &[u8] = "└".as_bytes();
+
 /// A [`Section`] that writes branches for tree-based views.
 #[derive(Clone, Copy, Debug)]
 pub struct TreeSection {
     /// The number of directories deep that should be displayed.
     pub max_depth: usize,
-}
-
-impl TreeSection {
-    /// The bytes used for a bottom corner.
-    pub const CORNER_BOTTOM: &[u8] = "└".as_bytes();
-    /// The bytes used for a top corner.
-    pub const CORNER_TOP: &[u8] = "┌".as_bytes();
-    /// The bytes used for a horizontal line.
-    pub const LINE_HORIZONTAL: &[u8] = "─".as_bytes();
-    /// The bytes used for a vertical line.
-    pub const LINE_VERTICAL: &[u8] = "│".as_bytes();
-    /// The bytes used for padding.
-    pub const PADDING: &[u8] = b" ";
-    /// The bytes used for a horizontal split line.
-    pub const SPLIT_HORIZONTAL: &[u8] = "┬".as_bytes();
-    /// The bytes used for a vertical split line.
-    pub const SPLIT_VERTICAL: &[u8] = "├".as_bytes();
-
-    /// Creates a new [`TreeSection`].
-    #[must_use]
-    pub const fn new(max_depth: usize) -> Self {
-        Self { max_depth }
-    }
 }
 
 impl Section for TreeSection {
@@ -64,35 +56,47 @@ impl Section for TreeSection {
 
         if entry.is_first() && depth == 0 {
             return if color {
-                writev!(f, [Self::CORNER_TOP, Self::LINE_HORIZONTAL] in BrightBlack)
+                writev!(f, [VERTICAL_START_CHARACTER, HORIZONTAL_CHARACTER] in BrightBlack)
             } else {
-                writev!(f, [Self::CORNER_TOP, Self::LINE_HORIZONTAL])
+                writev!(f, [VERTICAL_START_CHARACTER, HORIZONTAL_CHARACTER])
             };
         }
 
-        let join = if entry.is_last() { Self::CORNER_BOTTOM } else { Self::SPLIT_VERTICAL };
-        let connect = if parents.len() < self.max_depth && entry.has_children() {
-            Self::SPLIT_HORIZONTAL
+        let vertical_connection = if entry.is_last() { VERTICAL_FINAL_CHARACTER } else { VERTICAL_BRANCH_CHARACTER };
+        let horizontal_connection = if depth < self.max_depth && entry.has_children() {
+            HORIZONTAL_BRANCH_CHARACTER
         } else {
-            Self::LINE_HORIZONTAL
+            HORIZONTAL_CHARACTER
         };
 
-        let mut buffer = Vec::with_capacity(parents.len() * 2);
+        let mut indent_buffer = Vec::with_capacity(parents.len() * 2);
 
-        for parent in parents.iter().skip(1) {
-            if parent.is_last() {
-                buffer.extend_from_slice(Self::PADDING);
+        for parent_entry in parents.iter().skip(1) {
+            if parent_entry.is_last() {
+                indent_buffer.extend_from_slice(PADDING_CHARACTER);
             } else {
-                buffer.extend_from_slice(Self::LINE_VERTICAL);
+                indent_buffer.extend_from_slice(VERTICAL_CHARACTER);
             }
 
-            buffer.extend_from_slice(Self::PADDING);
+            indent_buffer.extend_from_slice(PADDING_CHARACTER);
         }
 
         if color {
-            writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL] in BrightBlack)
+            writev!(f, [
+                &indent_buffer,
+                vertical_connection,
+                HORIZONTAL_CHARACTER,
+                horizontal_connection,
+                HORIZONTAL_CHARACTER
+            ] in BrightBlack)
         } else {
-            writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL])
+            writev!(f, [
+                &indent_buffer,
+                vertical_connection,
+                HORIZONTAL_CHARACTER,
+                horizontal_connection,
+                HORIZONTAL_CHARACTER
+            ])
         }
     }
 }
