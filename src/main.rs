@@ -32,18 +32,18 @@ use std::process::ExitCode;
 use self::arguments::ParseResult;
 use self::arguments::model::SubCommand;
 
-pub mod arguments;
-pub mod files;
-pub mod section;
+mod arguments;
+mod files;
+mod section;
 
 /// Defines subcommand implementations.
-pub mod command {
+mod command {
     pub mod list;
     pub mod tree;
 }
 
 /// Defines the application's constant exit codes.
-pub mod exit_codes {
+mod exit_codes {
     /// The program ran successfully.
     pub const SUCCESS: u8 = 0;
     /// A generic error was encountered.

@@ -66,7 +66,7 @@ impl ColorChoice {
     ///
     /// [`Auto`]: ColorChoice::Auto
     #[must_use]
-    pub const fn is_auto(&self) -> bool {
+    pub const fn is_auto(self) -> bool {
         matches!(self, Self::Auto)
     }
 
@@ -74,7 +74,7 @@ impl ColorChoice {
     ///
     /// [`Always`]: ColorChoice::Always
     #[must_use]
-    pub const fn is_always(&self) -> bool {
+    pub const fn is_always(self) -> bool {
         matches!(self, Self::Always)
     }
 
@@ -82,13 +82,13 @@ impl ColorChoice {
     ///
     /// [`Never`]: ColorChoice::Never
     #[must_use]
-    pub const fn is_never(&self) -> bool {
+    pub const fn is_never(self) -> bool {
         matches!(self, Self::Never)
     }
 
     /// Returns whether or not color should be enabled.
     #[must_use]
-    pub fn should_be_enabled(&self) -> bool {
+    pub fn should_be_enabled(self) -> bool {
         use supports_color::Stream;
 
         self.is_always() || (self.is_auto() && supports_color::on_cached(Stream::Stdout).is_some_and(|v| v.has_basic))
@@ -252,7 +252,7 @@ impl SizeVisibility {
     ///
     /// [`Hide`]: SizeVisibility::Hide
     #[must_use]
-    pub const fn is_hide(&self) -> bool {
+    pub const fn is_hide(self) -> bool {
         matches!(self, Self::Hide)
     }
 
@@ -260,7 +260,7 @@ impl SizeVisibility {
     ///
     /// [`Simple`]: SizeVisibility::Simple
     #[must_use]
-    pub const fn is_simple(&self) -> bool {
+    pub const fn is_simple(self) -> bool {
         matches!(self, Self::Simple)
     }
 
@@ -268,7 +268,7 @@ impl SizeVisibility {
     ///
     /// [`Base2`]: SizeVisibility::Base2
     #[must_use]
-    pub const fn is_base2(&self) -> bool {
+    pub const fn is_base2(self) -> bool {
         matches!(self, Self::Base2)
     }
 
@@ -276,7 +276,7 @@ impl SizeVisibility {
     ///
     /// [`Base10`]: SizeVisibility::Base10
     #[must_use]
-    pub const fn is_base10(&self) -> bool {
+    pub const fn is_base10(self) -> bool {
         matches!(self, Self::Base10)
     }
 }
@@ -298,7 +298,7 @@ impl TimeVisibility {
     ///
     /// [`Hide`]: TimeVisibility::Hide
     #[must_use]
-    pub const fn is_hide(&self) -> bool {
+    pub const fn is_hide(self) -> bool {
         matches!(self, Self::Hide)
     }
 
@@ -306,7 +306,7 @@ impl TimeVisibility {
     ///
     /// [`Simple`]: TimeVisibility::Simple
     #[must_use]
-    pub const fn is_simple(&self) -> bool {
+    pub const fn is_simple(self) -> bool {
         matches!(self, Self::Simple)
     }
 
@@ -314,7 +314,7 @@ impl TimeVisibility {
     ///
     /// [`Iso8601`]: TimeVisibility::Iso8601
     #[must_use]
-    pub const fn is_iso8601(&self) -> bool {
+    pub const fn is_iso8601(self) -> bool {
         matches!(self, Self::Iso8601)
     }
 }
