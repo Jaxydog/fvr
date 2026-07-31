@@ -38,30 +38,9 @@ pub trait Section {
     /// # Errors
     ///
     /// This function will return an error if the section fails to write for any reason.
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>;
-
-    /// Writes this section into the given writer using color.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the section fails to write for any reason.
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>;
-
-    /// Writes this section into the given writer, determining whether to use color based on the given [`ColorChoice`].
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the section fails to write for any reason.
     fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        if color { self.write_color(f, parents, entry) } else { self.write_plain(f, parents, entry) }
-    }
+        F: Filter<(Box<Path>, EntryMetadata)>;
 }
 
 /// Returns a slice of bytes that correspond to the given color when output.
@@ -91,15 +70,15 @@ macro_rules! writev {
     ($f:ident, [$slice:expr]) => {
         <_ as ::std::io::Write>::write_all($f, $slice)
     };
-    ($f:ident, [$($slice:expr),* $(,)?]) => {
+    ($f:ident, [$($slice:expr),* $(,)?]) => {{
         if <_ as ::std::io::Write>::is_write_vectored($f) {
             <_ as ::std::io::Write>::write_all_vectored($f, &mut [$(::std::io::IoSlice::new($slice)),*])
         } else {
-            $(<_ as ::std::io::Write>::write_all($f, $slice)?;)*
+            let slices: [&[::std::primitive::u8]; _] = [$($slice),*];
 
-            ::std::io::Result::Ok(())
+            slices.into_iter().try_for_each(|slice| <_ as ::std::io::Write>::write_all($f, slice))
         }
-    };
+    }};
     ($f:ident, [$($slice:expr),* $(,)?] in $color:ident) => {
         $crate::writev!($f, [$crate::color_bytes!($color), $($slice,)* $crate::color_bytes!(Default)])
     };

@@ -56,14 +56,18 @@ impl TreeSection {
 }
 
 impl Section for TreeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
         let depth = parents.len();
 
         if entry.is_first() && depth == 0 {
-            return writev!(f, [Self::CORNER_TOP, Self::LINE_HORIZONTAL]);
+            return if color {
+                writev!(f, [Self::CORNER_TOP, Self::LINE_HORIZONTAL] in BrightBlack)
+            } else {
+                writev!(f, [Self::CORNER_TOP, Self::LINE_HORIZONTAL])
+            };
         }
 
         let join = if entry.is_last() { Self::CORNER_BOTTOM } else { Self::SPLIT_VERTICAL };
@@ -85,38 +89,10 @@ impl Section for TreeSection {
             buffer.extend_from_slice(Self::PADDING);
         }
 
-        writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL])
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        let depth = parents.len();
-
-        if entry.is_first() && depth == 0 {
-            return writev!(f, [Self::CORNER_TOP, Self::LINE_HORIZONTAL] in BrightBlack);
-        }
-
-        let join = if entry.is_last() { Self::CORNER_BOTTOM } else { Self::SPLIT_VERTICAL };
-        let connect = if parents.len() < self.max_depth && entry.has_children() {
-            Self::SPLIT_HORIZONTAL
+        if color {
+            writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL] in BrightBlack)
         } else {
-            Self::LINE_HORIZONTAL
-        };
-
-        let mut buffer = Vec::with_capacity(parents.len() * 2);
-
-        for parent in parents.iter().skip(1) {
-            if parent.is_last() {
-                buffer.extend_from_slice(Self::PADDING);
-            } else {
-                buffer.extend_from_slice(Self::LINE_VERTICAL);
-            }
-
-            buffer.extend_from_slice(Self::PADDING);
+            writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL])
         }
-
-        writev!(f, [&buffer, join, Self::LINE_HORIZONTAL, connect, Self::LINE_HORIZONTAL] in BrightBlack)
     }
 }

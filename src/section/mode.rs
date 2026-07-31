@@ -115,44 +115,35 @@ impl ModeSection {
 }
 
 impl Section for ModeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
-        let permissions = entry.data.as_ref().map_or_default(EntryMetadata::permissions);
-        let permissions = Self::get_permission_flags(permissions);
-        let permissions = if self.extended { &permissions } else { &permissions[3 ..] };
-
         let filetype = entry.data.as_ref().map_or_default(EntryMetadata::filetype);
         let filetype = Self::get_filetype_flag(filetype);
 
-        writev!(f, [&[b'[', filetype], permissions, b"]"])
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        writev!(f, [b"["] in White)?;
-
-        let filetype = entry.data.as_ref().map_or_default(EntryMetadata::filetype);
-
-        match Self::get_filetype_flag(filetype) {
-            v @ Self::TYPE_DIRECTORY => writev!(f, [&[v]] in BrightBlue)?,
-            v @ Self::TYPE_SYMBOLIC_LINK => writev!(f, [&[v]] in BrightCyan)?,
-            v @ Self::TYPE_FIFO_PIPE => writev!(f, [&[v]] in BrightYellow)?,
-            v @ Self::TYPE_SOCKET => writev!(f, [&[v]] in BrightGreen)?,
-            v @ Self::TYPE_BLOCK_DEVICE => writev!(f, [&[v]] in BrightRed)?,
-            v @ Self::TYPE_CHARACTER_DEVICE => writev!(f, [&[v]] in BrightMagenta)?,
-            v @ (Self::TYPE_FILE | Self::TYPE_UNKNOWN) => writev!(f, [&[v]] in BrightBlack)?,
-            _ => unreachable!(),
-        }
-
         let permissions = entry.data.as_ref().map_or_default(EntryMetadata::permissions);
         let permissions = Self::get_permission_flags(permissions);
         let permissions = if self.extended { &permissions } else { &permissions[3 ..] };
 
-        let mut buffer = Vec::<u8>::with_capacity(permissions.len() * 6);
+        if !color {
+            return writev!(f, [&[b'[', filetype], permissions, b"]"]);
+        }
+
+        let mut buffer = Vec::<u8>::with_capacity((permissions.len() + 1) * 6);
+
+        buffer.extend_from_slice(match filetype {
+            Self::TYPE_DIRECTORY => color_bytes!(BrightBlue),
+            Self::TYPE_SYMBOLIC_LINK => color_bytes!(BrightCyan),
+            Self::TYPE_FIFO_PIPE => color_bytes!(BrightYellow),
+            Self::TYPE_SOCKET => color_bytes!(BrightGreen),
+            Self::TYPE_BLOCK_DEVICE => color_bytes!(BrightRed),
+            Self::TYPE_CHARACTER_DEVICE => color_bytes!(BrightMagenta),
+            Self::TYPE_FILE | Self::TYPE_UNKNOWN => color_bytes!(BrightBlack),
+            _ => unreachable!(),
+        });
+
+        buffer.push(filetype);
 
         for permission in permissions {
             buffer.extend_from_slice(match *permission {
@@ -169,7 +160,6 @@ impl Section for ModeSection {
             buffer.push(*permission);
         }
 
-        writev!(f, [&buffer])?;
-        writev!(f, [b"]"] in White)
+        writev!(f, [color_bytes!(White), b"[", &buffer, color_bytes!(White), b"]", color_bytes!(Default)])
     }
 }

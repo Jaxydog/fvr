@@ -16,6 +16,7 @@
 
 //! Implements a section that displays an entry's size.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{Result, StdoutLock};
 use std::path::Path;
@@ -26,7 +27,7 @@ use recomposition::filter::Filter;
 use super::Section;
 use crate::arguments::model::SizeVisibility;
 use crate::files::{Entry, EntryMetadata};
-use crate::writev;
+use crate::{color_bytes, writev};
 
 /// Defines human-readable units.
 pub mod units {
@@ -173,48 +174,77 @@ impl SizeSection {
             })
         })
     }
+
+    fn directory_bytes(self, length: usize) -> Cow<'static, [u8]> {
+        const BASE_2: &[u8] = &[
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_BLANK,
+            SizeSection::CHAR_DECIMAL,
+            SizeSection::CHAR_BLANK,
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_BLANK,
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_PADDING,
+        ];
+        const BASE_10: &[u8] = &[
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_BLANK,
+            SizeSection::CHAR_DECIMAL,
+            SizeSection::CHAR_BLANK,
+            SizeSection::CHAR_PADDING,
+            SizeSection::CHAR_BLANK,
+            SizeSection::CHAR_PADDING,
+        ];
+
+        match self.visibility {
+            SizeVisibility::Hide => unreachable!(),
+            SizeVisibility::Simple => {
+                (0 .. length).map(|n| if n == 0 { Self::CHAR_BLANK } else { Self::CHAR_PADDING }).collect()
+            }
+            SizeVisibility::Base2 => Cow::Borrowed(BASE_2),
+            SizeVisibility::Base10 => Cow::Borrowed(BASE_10),
+        }
+    }
 }
 
 impl Section for SizeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
         if entry.is_dir() {
             let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
             let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
+            let bytes = self.directory_bytes(length);
 
-            return match self.visibility {
-                SizeVisibility::Simple => {
-                    writev!(f, [&[Self::CHAR_BLANK], &vec![Self::CHAR_PADDING; length - 1]])
-                }
-                SizeVisibility::Base2 => writev!(f, [
-                    &[Self::CHAR_PADDING; 3],
-                    &[Self::CHAR_BLANK, Self::CHAR_DECIMAL, Self::CHAR_BLANK],
-                    &[Self::CHAR_PADDING, Self::CHAR_BLANK],
-                    &[Self::CHAR_PADDING; 2],
-                ]),
-                SizeVisibility::Base10 => writev!(f, [
-                    &[Self::CHAR_PADDING; 2],
-                    &[Self::CHAR_BLANK, Self::CHAR_DECIMAL, Self::CHAR_BLANK],
-                    &[Self::CHAR_PADDING, Self::CHAR_BLANK, Self::CHAR_PADDING],
-                ]),
-                SizeVisibility::Hide => unreachable!(),
-            };
+            return if color { writev!(f, [&bytes] in BrightBlack) } else { writev!(f, [&bytes]) };
         }
 
         let size = entry.data.as_ref().map_or(0, |data| data.size);
 
         if self.visibility.is_simple() {
+            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
+            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
+
             let mut buffer = itoa::Buffer::new();
             let bytes = buffer.format(size).as_bytes();
 
-            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
-            let padding = vec![Self::CHAR_PADDING; length];
-            let padding = &padding[.. length - bytes.len()];
+            let padding = vec![Self::CHAR_PADDING; length - bytes.len()];
 
-            return writev!(f, [bytes, padding]);
+            if !color {
+                return writev!(f, [bytes, &padding]);
+            }
+
+            let size_color = match size {
+                v if v < Self::MEDIUM_THRESHOLD => color_bytes!(BrightGreen),
+                v if v < Self::LARGE_THRESHOLD => color_bytes!(BrightYellow),
+                _ => color_bytes!(BrightRed),
+            };
+
+            return writev!(f, [size_color, bytes, color_bytes!(Default), &padding]);
         }
 
         let (scaled_size, suffix, padding): (f64, &[u8], &[u8]) = if self.visibility.is_base2() {
@@ -229,80 +259,22 @@ impl Section for SizeSection {
 
         let mut buffer = zmij::Buffer::new();
         let bytes = buffer.format(scaled_size).as_bytes();
+
         let Some((whole, decimal)) = bytes.split_once(|b| *b == Self::CHAR_DECIMAL) else { unreachable!() };
         let decimal = &[Self::CHAR_DECIMAL, decimal[0], Self::CHAR_PADDING];
 
         let padding = &padding[.. padding.len() - (whole.len() + 3 + suffix.len())];
 
-        writev!(f, [padding, whole, decimal, suffix])
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        if entry.is_dir() {
-            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
-
-            return match self.visibility {
-                SizeVisibility::Simple => {
-                    writev!(f, [&[Self::CHAR_BLANK], &vec![Self::CHAR_PADDING; length - 1]] in BrightBlack)
-                }
-                SizeVisibility::Base2 => writev!(f, [
-                    &[Self::CHAR_PADDING; 3],
-                    &[Self::CHAR_BLANK, Self::CHAR_DECIMAL, Self::CHAR_BLANK],
-                    &[Self::CHAR_PADDING, Self::CHAR_BLANK],
-                    &[Self::CHAR_PADDING; 2],
-                ] in BrightBlack),
-                SizeVisibility::Base10 => writev!(f, [
-                    &[Self::CHAR_PADDING; 2],
-                    &[Self::CHAR_BLANK, Self::CHAR_DECIMAL, Self::CHAR_BLANK],
-                    &[Self::CHAR_PADDING, Self::CHAR_BLANK, Self::CHAR_PADDING],
-                ] in BrightBlack),
-                SizeVisibility::Hide => unreachable!(),
-            };
+        if !color {
+            return writev!(f, [padding, whole, decimal, suffix]);
         }
 
-        let size = entry.data.as_ref().map_or(0, |data| data.size);
-
-        if self.visibility.is_simple() {
-            let mut buffer = itoa::Buffer::new();
-            let bytes = buffer.format(size).as_bytes();
-
-            let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-            let length = parent_path.map_or(Self::WIDTH_SIMPLE, Self::max_simple_len);
-            let padding = vec![Self::CHAR_PADDING; length];
-            let padding = &padding[.. length - bytes.len()];
-
-            return match size {
-                v if v < Self::MEDIUM_THRESHOLD => writev!(f, [bytes, padding] in BrightGreen),
-                v if v < Self::LARGE_THRESHOLD => writev!(f, [bytes, padding] in BrightYellow),
-                _ => writev!(f, [bytes, padding] in BrightRed),
-            };
-        }
-
-        let (scaled_size, suffix, padding): (f64, &[u8], &[u8]) = if self.visibility.is_base2() {
-            let (scaled_size, unit) = self::units::get_base_2(size);
-
-            (scaled_size, unit.suffix, Self::PAD_BASE_2)
-        } else {
-            let (scaled_size, unit) = self::units::get_base_10(size);
-
-            (scaled_size, unit.suffix, Self::PAD_BASE_10)
+        let size_color = match size {
+            v if v < Self::MEDIUM_THRESHOLD => color_bytes!(BrightGreen),
+            v if v < Self::LARGE_THRESHOLD => color_bytes!(BrightYellow),
+            _ => color_bytes!(BrightRed),
         };
 
-        let mut buffer = zmij::Buffer::new();
-        let bytes = buffer.format(scaled_size).as_bytes();
-        let Some((whole, decimal)) = bytes.split_once(|b| *b == Self::CHAR_DECIMAL) else { unreachable!() };
-        let decimal = &[Self::CHAR_DECIMAL, decimal[0], Self::CHAR_PADDING];
-
-        let padding = &padding[.. padding.len() - (whole.len() + 3 + suffix.len())];
-
-        match size {
-            v if v < Self::MEDIUM_THRESHOLD => writev!(f, [padding, whole, decimal, suffix] in BrightGreen),
-            v if v < Self::LARGE_THRESHOLD => writev!(f, [padding, whole, decimal, suffix] in BrightYellow),
-            _ => writev!(f, [padding, whole, decimal, suffix] in BrightRed),
-        }
+        writev!(f, [padding, size_color, whole, decimal, suffix, color_bytes!(Default)])
     }
 }

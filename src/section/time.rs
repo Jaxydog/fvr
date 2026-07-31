@@ -98,56 +98,43 @@ impl TimeSection {
     }
 }
 
-#[expect(clippy::expect_used, reason = "formatting only fails if the defined formats are somehow invalid")]
 impl Section for TimeSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
-        let Some(timestamp) = entry.data.as_ref().map(|data| match self.kind {
-            TimeSectionType::Created => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.ctime),
-            TimeSectionType::Accessed => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.atime),
-            TimeSectionType::Modified => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.mtime),
+        let Some(timestamp_seconds) = entry.data.as_ref().map(|data| match self.kind {
+            TimeSectionType::Created => data.ctime,
+            TimeSectionType::Accessed => data.atime,
+            TimeSectionType::Modified => data.mtime,
         }) else {
-            return writev!(f, [
-                &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
-            ]);
+            const PADDING_SIMPLE: &[u8] = &[CHAR_PADDING; SIZE_SIMPLE];
+            const PADDING_ISO_8601: &[u8] = &[CHAR_PADDING; SIZE_ISO_8601];
+
+            let padding = if self.visibility.is_simple() { PADDING_SIMPLE } else { PADDING_ISO_8601 };
+
+            return if color {
+                writev!(f, [&[CHAR_MISSING], padding] in BrightBlack)
+            } else {
+                writev!(f, [&[CHAR_MISSING], padding])
+            };
         };
 
-        let timestamp = OFFSET.with(|offset| timestamp.to_offset(*offset));
-        let formatted = match self.visibility {
-            TimeVisibility::Simple => timestamp.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => timestamp.format(&Iso8601::DEFAULT),
-            TimeVisibility::Hide => unreachable!(),
-        }
-        .expect("will only fail if the formats are invalid");
+        let timestamp = OFFSET.with(|offset| {
+            (OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(timestamp_seconds)).to_offset(*offset)
+        });
 
-        writev!(f, [formatted.as_bytes()])
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, _: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        let Some(timestamp) = entry.data.as_ref().map(|data| match self.kind {
-            TimeSectionType::Created => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.ctime),
-            TimeSectionType::Accessed => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.atime),
-            TimeSectionType::Modified => OffsetDateTime::UNIX_EPOCH + SignedDuration::seconds(data.mtime),
+        let Ok(formatted) = (if self.visibility.is_simple() {
+            timestamp.format(SIMPLE_FORMAT)
+        } else {
+            timestamp.format(&Iso8601::DEFAULT)
         }) else {
-            return writev!(f, [
-                &[CHAR_MISSING],
-                if self.visibility.is_simple() { &[CHAR_PADDING; SIZE_SIMPLE] } else { &[CHAR_PADDING; SIZE_ISO_8601] }
-            ] in BrightBlack);
+            unreachable!("timestamp format must be valid")
         };
 
-        let timestamp = OFFSET.with(|offset| timestamp.to_offset(*offset));
-        let formatted = match self.visibility {
-            TimeVisibility::Simple => timestamp.format(SIMPLE_FORMAT),
-            TimeVisibility::Iso8601 => timestamp.format(&Iso8601::DEFAULT),
-            TimeVisibility::Hide => unreachable!(),
+        if !color {
+            return writev!(f, [formatted.as_bytes()]);
         }
-        .expect("will only fail if the formats are invalid");
 
         match self.kind {
             TimeSectionType::Created => writev!(f, [formatted.as_bytes()] in BrightGreen),

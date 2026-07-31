@@ -81,7 +81,7 @@ impl UserSection {
 }
 
 impl Section for UserSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
@@ -89,28 +89,20 @@ impl Section for UserSection {
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
         let Some(user) = entry.data.as_ref().and_then(|data| Self::name(data.uid)) else {
-            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
+            return if color {
+                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack)
+            } else {
+                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]])
+            };
         };
 
         let padding = vec![CHAR_PADDING; length.saturating_sub(user.len())];
 
-        writev!(f, [user.as_encoded_bytes(), &padding])
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-        let length = parent_path.map_or(MAX_LEN, Self::max_len);
-
-        let Some(user) = entry.data.as_ref().and_then(|data| Self::name(data.uid)) else {
-            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
-        };
-
-        let padding = vec![CHAR_PADDING; length.saturating_sub(user.len())];
-
-        writev!(f, [user.as_encoded_bytes(), &padding] in BrightGreen)
+        if color {
+            writev!(f, [user.as_encoded_bytes(), &padding] in BrightGreen)
+        } else {
+            writev!(f, [user.as_encoded_bytes(), &padding])
+        }
     }
 }
 
@@ -158,7 +150,7 @@ impl GroupSection {
 }
 
 impl Section for GroupSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
@@ -166,27 +158,19 @@ impl Section for GroupSection {
         let length = parent_path.map_or(MAX_LEN, Self::max_len);
 
         let Some(group) = entry.data.as_ref().and_then(|data| Self::name(data.gid)) else {
-            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
+            return if color {
+                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]] in BrightBlack)
+            } else {
+                writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]])
+            };
         };
 
         let padding = vec![CHAR_PADDING; length.saturating_sub(group.len())];
 
-        writev!(f, [group.as_encoded_bytes(), &padding])
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        let parent_path = parents.last().map_or_else(|| entry.path.parent(), |parent| Some(&parent.path));
-        let length = parent_path.map_or(MAX_LEN, Self::max_len);
-
-        let Some(group) = entry.data.as_ref().and_then(|data| Self::name(data.gid)) else {
-            return writev!(f, [&[CHAR_MISSING], &vec![b' '; length - 1]]);
-        };
-
-        let padding = vec![CHAR_PADDING; length.saturating_sub(group.len())];
-
-        writev!(f, [group.as_encoded_bytes(), &padding] in BrightYellow)
+        if color {
+            writev!(f, [group.as_encoded_bytes(), &padding] in BrightYellow)
+        } else {
+            writev!(f, [group.as_encoded_bytes(), &padding])
+        }
     }
 }

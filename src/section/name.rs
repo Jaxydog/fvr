@@ -24,7 +24,7 @@ use recomposition::filter::Filter;
 
 use super::Section;
 use crate::files::{Entry, EntryMetadata};
-use crate::writev;
+use crate::{color_bytes, writev};
 
 /// A [`Section`] that writes an entry's name.
 #[derive(Clone, Copy, Debug)]
@@ -52,59 +52,76 @@ impl NameSection {
 }
 
 impl Section for NameSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
-        let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or_else(|| {
-            // This is so that the directory suffix is only ever written once.
-            entry.path.trim_trailing_sep().as_os_str()
-        });
-
-        if entry.is_symlink() {
-            writev!(f, [name.as_encoded_bytes(), Self::SYMLINK_SUFFIX])?;
-        } else if entry.is_dir() && !name.as_encoded_bytes().eq_ignore_ascii_case(b"/") {
-            writev!(f, [name.as_encoded_bytes(), Self::DIR_SUFFIX])?;
-        } else if entry.is_file() && entry.is_executable() {
-            writev!(f, [name.as_encoded_bytes(), Self::EXE_SUFFIX])?;
-        } else {
-            writev!(f, [name.as_encoded_bytes()])?;
-        }
-
-        if self.resolve_symlinks && entry.is_symlink() { SymlinkSection.write_plain(f, parents, entry) } else { Ok(()) }
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        let name = (if self.trim_paths { entry.path.file_name() } else { None }).unwrap_or_else(|| {
+        let name = entry.path.file_name().filter(|_| self.trim_paths).unwrap_or_else(|| {
             // This is so that the directory suffix is only ever written once.
             entry.path.trim_trailing_sep().as_os_str()
         });
         let name = name.as_encoded_bytes();
 
-        if entry.is_symlink() {
-            if entry.is_hidden() { writev!(f, [name] in Cyan) } else { writev!(f, [name] in BrightCyan) }?;
+        let suffix = if entry.is_symlink() {
+            Self::SYMLINK_SUFFIX
+        } else if entry.is_dir() && !name.eq_ignore_ascii_case(b"/") {
+            Self::DIR_SUFFIX
+        } else if entry.is_file() && entry.is_executable() {
+            Self::EXE_SUFFIX
+        } else {
+            &[]
+        };
 
-            writev!(f, [Self::SYMLINK_SUFFIX] in White)?;
+        if !color {
+            writev!(f, [name, suffix])?;
 
-            if self.resolve_symlinks { SymlinkSection.write_color(f, parents, entry) } else { Ok(()) }
-        } else if entry.is_dir() {
-            if !name.eq_ignore_ascii_case(b"/") {
-                if entry.is_hidden() { writev!(f, [name] in Blue) } else { writev!(f, [name] in BrightBlue) }?;
+            if self.resolve_symlinks && entry.is_symlink() {
+                SymlinkSection.write(color, f, parents, entry)?;
             }
 
-            writev!(f, [Self::DIR_SUFFIX] in White)
-        } else if entry.is_executable() {
-            if entry.is_hidden() { writev!(f, [name] in Green) } else { writev!(f, [name] in BrightGreen) }?;
-
-            writev!(f, [Self::EXE_SUFFIX] in White)
-        } else {
-            // We purposefully do not color the name for non-hidden files since uncolored text is brighter than white
-            // for some terminal themes, and leaving it as such makes it easier to differentiate.
-            if entry.is_hidden() { writev!(f, [name] in White) } else { writev!(f, [name] in Default) }
+            return Ok(());
         }
+
+        let entry_color = match suffix {
+            Self::SYMLINK_SUFFIX => {
+                if entry.is_hidden() {
+                    color_bytes!(Cyan)
+                } else {
+                    color_bytes!(BrightCyan)
+                }
+            }
+            Self::DIR_SUFFIX => {
+                if entry.is_hidden() {
+                    color_bytes!(Blue)
+                } else {
+                    color_bytes!(BrightBlue)
+                }
+            }
+            Self::EXE_SUFFIX => {
+                if entry.is_hidden() {
+                    color_bytes!(Green)
+                } else {
+                    color_bytes!(BrightGreen)
+                }
+            }
+            _ => {
+                if entry.is_hidden() {
+                    color_bytes!(White)
+                } else {
+                    // We purposefully do not color the name for non-hidden files since uncolored text is brighter than
+                    // white for some terminal themes, and leaving it as such makes it easier to differentiate.
+                    color_bytes!(Default)
+                }
+            }
+        };
+
+        writev!(f, [entry_color, name, color_bytes!(White), suffix, color_bytes!(Default)])?;
+
+        if self.resolve_symlinks && entry.is_symlink() {
+            SymlinkSection.write(color, f, parents, entry)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -122,10 +139,12 @@ impl SymlinkSection {
 }
 
 impl Section for SymlinkSection {
-    fn write_plain<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
+    fn write<F>(&self, color: bool, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
     where
         F: Filter<(Box<Path>, EntryMetadata)>,
     {
+        const NAME_SECTION: NameSection = NameSection { trim_paths: false, resolve_symlinks: false };
+
         let link_path = std::fs::read_link(&entry.path)?;
         let real_path = if link_path.is_relative()
             && let Some(parent) = parents.last().map(|entry| &entry.path)
@@ -135,70 +154,35 @@ impl Section for SymlinkSection {
             Cow::Borrowed(&link_path)
         };
 
-        let data = match std::fs::metadata(real_path.as_ref()) {
-            Ok(data) => Some(EntryMetadata::new(&data)),
-            Err(error) if error.kind() == ErrorKind::NotFound => None,
-            Err(error) if error.kind() == ErrorKind::FilesystemLoop => {
-                writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "])?;
+        let (data, arrow, arrow_color) = match std::fs::metadata(real_path.as_ref()) {
+            Ok(data) => (Some(EntryMetadata::new(&data)), Self::LINKED_ARROW, color_bytes!(White)),
+            Err(error) if error.kind() == ErrorKind::NotFound => (None, Self::BROKEN_ARROW, color_bytes!(BrightRed)),
+
+            Err(error) if error.kind() != ErrorKind::FilesystemLoop => return Err(error),
+            Err(_) => {
+                if color {
+                    writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "] in Cyan)?;
+                } else {
+                    writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "])?;
+                }
 
                 let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
-                let data = std::fs::symlink_metadata(real_path.as_ref()).ok().map(|m| EntryMetadata::new(&m));
+                let data = std::fs::symlink_metadata(real_path.as_ref()).ok().map(|data| EntryMetadata::new(&data));
                 let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
-                return NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry);
+                return NAME_SECTION.write(color, f, parents, &entry);
             }
-            Err(error) => return Err(error),
         };
 
-        if data.is_some() {
-            writev!(f, [b" ", Self::LINKED_ARROW, b" "])?;
+        if color {
+            writev!(f, [b" ", arrow_color, arrow, color_bytes!(Default), b" "])?;
         } else {
-            writev!(f, [b" ", Self::BROKEN_ARROW, b" "])?;
+            writev!(f, [b" ", arrow, b" "])?;
         }
 
         let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
         let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
 
-        NameSection { trim_paths: false, resolve_symlinks: false }.write_plain(f, parents, &entry)
-    }
-
-    fn write_color<F>(&self, f: &mut StdoutLock<'_>, parents: &[&Entry<F>], entry: &Entry<F>) -> Result<()>
-    where
-        F: Filter<(Box<Path>, EntryMetadata)>,
-    {
-        let link_path = std::fs::read_link(&entry.path)?;
-        let real_path = if link_path.is_relative()
-            && let Some(parent) = parents.last().map(|entry| &entry.path)
-        {
-            Cow::Owned(parent.join(&link_path))
-        } else {
-            Cow::Borrowed(&link_path)
-        };
-
-        let data = match std::fs::metadata(real_path.as_ref()) {
-            Ok(data) => Some(EntryMetadata::new(&data)),
-            Err(error) if error.kind() == ErrorKind::NotFound => None,
-            Err(error) if error.kind() == ErrorKind::FilesystemLoop => {
-                writev!(f, [b" ", Self::RECURSIVE_ARROW, b" "] in Cyan)?;
-
-                let path = crate::files::relativize(&entry.path, &link_path).unwrap_or_else(|| link_path.clone());
-                let data = std::fs::symlink_metadata(real_path.as_ref()).ok().map(|m| EntryMetadata::new(&m));
-                let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
-
-                return NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry);
-            }
-            Err(error) => return Err(error),
-        };
-
-        if data.is_some() {
-            writev!(f, [b" ", Self::LINKED_ARROW, b" "] in White)?;
-        } else {
-            writev!(f, [b" ", Self::BROKEN_ARROW, b" "] in BrightRed)?;
-        }
-
-        let path = crate::files::relativize(&entry.path, &link_path).unwrap_or(link_path);
-        let entry = Entry::root(path.into_boxed_path(), data, entry.filter);
-
-        NameSection { trim_paths: false, resolve_symlinks: false }.write_color(f, parents, &entry)
+        NAME_SECTION.write(color, f, parents, &entry)
     }
 }
