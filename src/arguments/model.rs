@@ -24,9 +24,9 @@ use recomposition::sort::Sort;
 
 use crate::files::EntryMetadata;
 use crate::section::mode::ModeSection;
+use crate::section::owner::OwnerSection;
 use crate::section::size::SizeSection;
 use crate::section::time::TimeSection;
-use crate::section::user::{GroupSection, UserSection};
 
 /// The program's command-line arguments.
 #[derive(Debug, Default)]
@@ -113,9 +113,9 @@ pub struct ListArguments {
     /// The preferred modification date visibility.
     pub modified: Option<TimeSection>,
     /// Whether to show owner users.
-    pub user: Option<UserSection>,
+    pub user: Option<OwnerSection>,
     /// Whether to show owner groups.
-    pub group: Option<GroupSection>,
+    pub group: Option<OwnerSection>,
 }
 
 /// The program's command-line arguments for the tree subcommand.

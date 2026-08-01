@@ -55,16 +55,7 @@ thread_local! {
     static LOCAL_OFFSET: UtcOffset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
 }
 
-/// Determines how timestamps are displayed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Format {
-    /// Display in a simple format.
-    Simple,
-    /// Display in ISO-8601 format.
-    Iso8601,
-}
-
-/// Determines what type of time section is shown.
+/// Determines what type of timestamp is shown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     /// Created timestamp.
@@ -73,6 +64,15 @@ pub enum Kind {
     Accessed,
     /// Modified timestamp.
     Modified,
+}
+
+/// Determines how timestamps are displayed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    /// Display in a simple format.
+    Simple,
+    /// Display in ISO-8601 format.
+    Iso8601,
 }
 
 /// A [`Section`] that writes an entry's extracted date.

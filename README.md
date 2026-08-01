@@ -93,8 +93,12 @@ List Arguments:
                                 - default: hide
                                 - options: hide, simple, iso8601
 
-      --user                    Display the name of each entry's owner
-      --group                   Display the name of each entry's owner group
+      --user <visibility>       Display the name of each entry's owner user
+                                - default: hide
+                                - options: hide, id, name
+      --group <visibility>      Display the name of each entry's owner group
+                                - default: hide
+                                - options: hide, id, name
 
 Tree Arguments:
   -d, --depth <depth>           Determines how many layers deep the tree should display

@@ -25,10 +25,10 @@ use crate::files::{Entry, EntryMetadata};
 
 pub mod mode;
 pub mod name;
+pub mod owner;
 pub mod size;
 pub mod time;
 pub mod tree;
-pub mod user;
 
 /// A section of data that should be displayed to the terminal.
 #[must_use = "section implementations do nothing unless you call `write`"]

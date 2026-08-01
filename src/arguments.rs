@@ -25,9 +25,9 @@ use carp::{ArgumentOrPositional, Parser};
 use self::model::{Arguments, ColorChoice, ListArguments, SortOrder, SubCommand, TreeArguments};
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 use crate::section::mode::ModeSection;
+use crate::section::owner::{Format as OwnerFormat, Kind as OwnerKind, OwnerSection};
 use crate::section::size::SizeSection;
 use crate::section::time::{Format as TimeFormat, Kind as TimeKind, TimeSection};
-use crate::section::user::{GroupSection, UserSection};
 
 pub mod model;
 
@@ -81,8 +81,12 @@ List Arguments:
                                 - default: hide
                                 - options: hide, simple, iso8601
 
-      --user                    Display the name of each entry's owner
-      --group                   Display the name of each entry's owner group
+      --user <visibility>       Display the name of each entry's owner user
+                                - default: hide
+                                - options: hide, id, name
+      --group <visibility>      Display the name of each entry's owner group
+                                - default: hide
+                                - options: hide, id, name
 
 Tree Arguments:
   -d, --depth <depth>           Determines how many layers deep the tree should display"
@@ -192,10 +196,10 @@ where
         }
 
         Argument(Short('u') | Long("user")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_user(arguments)
+            self::parse_owner(arguments, parser, OwnerKind::User)
         }
         Argument(Short('g') | Long("group")) if arguments.command.as_ref().is_some_and(SubCommand::is_list) => {
-            self::parse_group(arguments)
+            self::parse_owner(arguments, parser, OwnerKind::Group)
         }
 
         Argument(Short('d') | Long("depth")) if arguments.command.as_ref().is_some_and(SubCommand::is_tree) => {
@@ -376,26 +380,33 @@ where
     None
 }
 
-/// Parses the user command-line argument.
-fn parse_user(arguments: &mut Arguments) -> Option<ParseResult> {
-    let Some(command) = arguments.command.as_mut() else { unreachable!() };
+/// Parses the user and/or group command-line argument.
+fn parse_owner<'p, I>(
+    arguments: &mut Arguments,
+    parser: &mut Parser<&'p str, I>,
+    kind: OwnerKind,
+) -> Option<ParseResult>
+where
+    I: Iterator<Item = &'p str>,
+{
+    let Some(choice) = (match parser.parse_next_assigned_value() {
+        Ok(choice) => choice,
+        Err(error) => return Some(self::exit_and_print(ERROR_CLI_USAGE, error)),
+    }) else {
+        return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing owner visibility"));
+    };
 
-    match command {
-        SubCommand::List(arguments) => arguments.user = Some(UserSection),
-        SubCommand::Tree(_) => unreachable!(),
-    }
+    let Some(SubCommand::List(ListArguments { user, group, .. })) = arguments.command.as_mut() else { unreachable!() };
 
-    None
-}
-
-/// Parses the group command-line argument.
-fn parse_group(arguments: &mut Arguments) -> Option<ParseResult> {
-    let Some(command) = arguments.command.as_mut() else { unreachable!() };
-
-    match command {
-        SubCommand::List(arguments) => arguments.group = Some(GroupSection),
-        SubCommand::Tree(_) => unreachable!(),
-    }
+    *(match kind {
+        OwnerKind::User => user,
+        OwnerKind::Group => group,
+    }) = match choice {
+        "hide" => None,
+        "id" => Some(OwnerSection { kind, format: OwnerFormat::Identifier }),
+        "name" => Some(OwnerSection { kind, format: OwnerFormat::Name }),
+        v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid owner visibility '{v}'"))),
+    };
 
     None
 }
