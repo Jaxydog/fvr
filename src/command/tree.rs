@@ -33,13 +33,12 @@ use crate::section::tree::TreeSection;
 /// # Errors
 ///
 /// This function will return an error if the command fails.
-pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
+pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command else { unreachable!() };
 
     let tree_section = TreeSection { max_depth: tree_arguments.max_depth.map_or(usize::MAX, NonZero::get) };
     let name_section = NameSection { trim_paths: true, resolve_symlinks: arguments.resolve_symlinks };
 
-    let sort = arguments.sort_order.get_or_insert_default();
     let filter = recomposition::filter::from_fn(|(path, _)| {
         (arguments.show_hidden || !crate::files::is_hidden(path))
             && arguments.included.as_ref().is_none_or(|include| include.contains(path))
@@ -54,7 +53,7 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
 
     let mut paths = paths.collect::<std::io::Result<Box<[(Box<Path>, EntryMetadata)]>>>()?;
 
-    paths.sort_unstable_with(&sort);
+    paths.sort_unstable_with(&arguments.sort_order);
 
     let should_use_color = arguments.color.should_be_enabled();
     let f = &mut std::io::stdout().lock();
@@ -83,7 +82,7 @@ pub fn invoke(mut arguments: Arguments) -> std::io::Result<()> {
             &entry,
             tree_arguments.max_depth,
             &filter,
-            &sort,
+            &arguments.sort_order,
             &mut |parents, entry| {
                 tree_section.write(should_use_color, f, parents, entry)?;
                 name_section.write(should_use_color, f, parents, entry)?;

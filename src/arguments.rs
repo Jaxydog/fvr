@@ -22,7 +22,8 @@ use std::path::{Path, PathBuf};
 
 use carp::{ArgumentOrPositional, Parser};
 
-use self::model::{Arguments, ColorChoice, ListArguments, SortOrder, SubCommand, TreeArguments};
+use self::model::{Arguments, ColorChoice, ListArguments, SubCommand, TreeArguments};
+use crate::arguments::model::SortOrderType;
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 use crate::section::mode::ModeSection;
 use crate::section::owner::{Format as OwnerFormat, Kind as OwnerKind, OwnerSection};
@@ -58,9 +59,10 @@ Arguments:
   -r, --resolve-symlinks        Fully resolve symbolic link paths
 
       --sort <order>            Determines the sorting order of each displayed entry, accepts a comma-separated list
-                                - default: directories,files,name
-                                - options: name, accessed, created, modified, size, files, symlinks, directories, \
-     hidden, reverse-*
+                                - default: directory,file,name
+                                - options: name, accessed, created, modified, size, file, symlink, directory, hidden,
+                                    reverse-name, reverse-accessed, reverse-created reverse-modified, reverse-size,
+                                    reverse-file, reverse-symlink, reverse-directory, reverse-hidden
 
 List Arguments:
   -m, --mode <visibility>       Determines if and how the file mode of each entry is displayed
@@ -267,36 +269,28 @@ where
         return Some(self::exit_and_print(ERROR_CLI_USAGE, "missing sort order"));
     };
 
-    let mut sort_order = None::<SortOrder>;
+    arguments.sort_order.clear();
 
     for string in orderings.split(',') {
         let (string, is_reversed) = string.strip_prefix("reverse-").map_or((string, false), |string| (string, true));
 
         let Some(next) = (match string {
-            "name" => Some(SortOrder::Name),
-            "accessed" => Some(SortOrder::Accessed),
-            "created" => Some(SortOrder::Created),
-            "modified" => Some(SortOrder::Modified),
-            "size" => Some(SortOrder::Size),
-            "files" => Some(SortOrder::Files),
-            "symlinks" => Some(SortOrder::Symlinks),
-            "directories" => Some(SortOrder::Directories),
-            "hidden" => Some(SortOrder::Hidden),
+            "name" => Some(SortOrderType::Name),
+            "accessed" => Some(SortOrderType::Accessed),
+            "created" => Some(SortOrderType::Created),
+            "modified" => Some(SortOrderType::Modified),
+            "size" => Some(SortOrderType::Size),
+            "file" => Some(SortOrderType::File),
+            "symlink" => Some(SortOrderType::SymbolicLink),
+            "directory" => Some(SortOrderType::Directory),
+            "hidden" => Some(SortOrderType::Hidden),
             _ => None,
         }) else {
             return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid sort order '{string}'")));
         };
 
-        let next = if is_reversed { next.reverse() } else { next };
-
-        if let Some(current) = sort_order.take().filter(|v| v.top() != &next) {
-            sort_order = Some(current.then(next));
-        } else {
-            sort_order = Some(next);
-        }
+        arguments.sort_order.add(next, is_reversed);
     }
-
-    arguments.sort_order = sort_order;
 
     None
 }

@@ -16,6 +16,7 @@
 
 //! Defines the command's argument data types.
 
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::num::NonZero;
 use std::path::Path;
@@ -44,7 +45,7 @@ pub struct Arguments {
     /// The paths to include.
     pub included: Option<HashSet<Box<Path>>>,
     /// The preferred sorting order.
-    pub sort_order: Option<SortOrder>,
+    pub sort_order: SortOrder,
     /// The program's selected subcommand.
     pub command: Option<SubCommand>,
 }
@@ -69,6 +70,104 @@ impl ColorChoice {
         use supports_color::on_cached;
 
         matches!(self, Self::Always) || (matches!(self, Self::Auto) && on_cached(Stdout).is_some_and(|v| v.has_basic))
+    }
+}
+
+/// Implements a sort function based on a list of [`EntrySortOrder`] variants.
+#[derive(Clone, Debug)]
+pub struct SortOrder {
+    /// The inner sort order.
+    inner: Vec<(SortOrderType, bool)>,
+}
+
+impl SortOrder {
+    /// Clears the inner sort order.
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
+
+    /// Adds a sort order.
+    pub fn add(&mut self, order: SortOrderType, reverse: bool) {
+        self.inner.push((order, reverse));
+    }
+}
+
+impl Default for SortOrder {
+    fn default() -> Self {
+        Self {
+            inner: vec![(SortOrderType::Directory, false), (SortOrderType::File, false), (SortOrderType::Name, false)],
+        }
+    }
+}
+
+impl Sort<(Box<Path>, EntryMetadata)> for SortOrder {
+    fn compare(&self, lhs: &(Box<Path>, EntryMetadata), rhs: &(Box<Path>, EntryMetadata)) -> std::cmp::Ordering {
+        self.inner.iter().copied().fold(Ordering::Equal, |ordering, (variant, reverse)| {
+            ordering.then_with(|| {
+                let next = variant.compare(lhs, rhs);
+
+                if reverse { next.reverse() } else { next }
+            })
+        })
+    }
+}
+
+/// Defines a possible sort order for displayed entries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SortOrderType {
+    /// Filename.
+    Name,
+    /// Access date.
+    Accessed,
+    /// Creation date.
+    Created,
+    /// Modification date.
+    Modified,
+    /// File size.
+    Size,
+    /// Hidden files.
+    Hidden,
+    /// Directories.
+    Directory,
+    /// Files.
+    File,
+    /// Symbolic links.
+    SymbolicLink,
+}
+
+impl Sort<(Box<Path>, EntryMetadata)> for SortOrderType {
+    fn compare(&self, lhs: &(Box<Path>, EntryMetadata), rhs: &(Box<Path>, EntryMetadata)) -> std::cmp::Ordering {
+        match self {
+            Self::Name => recomposition::sort::order().map_ref(Path::as_os_str).compare(&lhs.0, &rhs.0),
+            Self::Accessed => {
+                recomposition::sort::order().reverse().map(|data: &EntryMetadata| data.atime).compare(&lhs.1, &rhs.1)
+            }
+            Self::Created => {
+                recomposition::sort::order().reverse().map(|data: &EntryMetadata| data.ctime).compare(&lhs.1, &rhs.1)
+            }
+            Self::Modified => {
+                recomposition::sort::order().reverse().map(|data: &EntryMetadata| data.mtime).compare(&lhs.1, &rhs.1)
+            }
+            Self::Size => {
+                recomposition::sort::order().map(|data: &EntryMetadata| data.size).compare(&lhs.1, &rhs.1) //
+            }
+            Self::Hidden => recomposition::sort::order()
+                .reverse()
+                .map(|path: &Path| crate::files::is_hidden(path))
+                .compare(&lhs.0, &rhs.0),
+            Self::Directory => recomposition::sort::order()
+                .reverse()
+                .map(|data: &EntryMetadata| data.filetype().is_directory())
+                .compare(&lhs.1, &rhs.1),
+            Self::File => recomposition::sort::order()
+                .reverse()
+                .map(|data: &EntryMetadata| data.filetype().is_file())
+                .compare(&lhs.1, &rhs.1),
+            Self::SymbolicLink => recomposition::sort::order()
+                .reverse()
+                .map(|data: &EntryMetadata| data.filetype().is_symbolic_link())
+                .compare(&lhs.1, &rhs.1),
+        }
     }
 }
 
@@ -123,89 +222,4 @@ pub struct ListArguments {
 pub struct TreeArguments {
     /// The depth of the search.
     pub max_depth: Option<NonZero<usize>>,
-}
-
-/// Describes how entries should be sorted.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SortOrder {
-    /// Alphabetically.
-    Name,
-    /// Access date.
-    Accessed,
-    /// Creation date.
-    Created,
-    /// Modification date.
-    Modified,
-    /// File size.
-    Size,
-    /// Hidden files.
-    Hidden,
-    /// Directories.
-    Directories,
-    /// Files.
-    Files,
-    /// Symbolic links.
-    Symlinks,
-    /// Reversed order.
-    Reverse(Box<Self>),
-    /// Chained order, preferring the left-most order.
-    Then(Box<(Self, Self)>),
-}
-
-impl SortOrder {
-    /// Chains this order with another, preferring this ordering.
-    #[inline]
-    #[must_use]
-    pub fn then(self, other: Self) -> Self {
-        Self::Then(Box::new((self, other)))
-    }
-
-    /// Reverses the ordering of this sort.
-    #[inline]
-    #[must_use]
-    pub fn reverse(self) -> Self {
-        match self {
-            Self::Reverse(sort) => *sort,
-            sort => Self::Reverse(Box::new(sort)),
-        }
-    }
-
-    /// Returns a reference to the most recent [`SortOrder`].
-    #[must_use]
-    pub fn top(&self) -> &Self {
-        match self {
-            Self::Then(v) => v.1.top(),
-            _ => self,
-        }
-    }
-}
-
-impl Sort<(Box<Path>, EntryMetadata)> for SortOrder {
-    fn compare(&self, lhs: &(Box<Path>, EntryMetadata), rhs: &(Box<Path>, EntryMetadata)) -> std::cmp::Ordering {
-        use recomposition::sort::{order, partial_order};
-
-        match self {
-            Self::Name => order().map_ref(Path::as_os_str).compare(&lhs.0, &rhs.0),
-            Self::Accessed => partial_order().reverse().map(|m: &EntryMetadata| m.atime).compare(&lhs.1, &rhs.1),
-            Self::Created => partial_order().reverse().map(|m: &EntryMetadata| m.ctime).compare(&lhs.1, &rhs.1),
-            Self::Modified => partial_order().reverse().map(|m: &EntryMetadata| m.mtime).compare(&lhs.1, &rhs.1),
-            Self::Size => order().map(|m: &EntryMetadata| m.size).compare(&lhs.1, &rhs.1),
-            Self::Hidden => order().reverse().map(|p| crate::files::is_hidden(p)).compare(&lhs.0, &rhs.0),
-            Self::Directories => {
-                order().reverse().map(|m: &EntryMetadata| m.filetype().is_directory()).compare(&lhs.1, &rhs.1)
-            }
-            Self::Files => order().reverse().map(|m: &EntryMetadata| m.filetype().is_file()).compare(&lhs.1, &rhs.1),
-            Self::Symlinks => {
-                order().reverse().map(|m: &EntryMetadata| m.filetype().is_symbolic_link()).compare(&lhs.1, &rhs.1)
-            }
-            Self::Reverse(sort_order) => sort_order.reverse().compare(lhs, rhs),
-            Self::Then(orders) => (&orders.0).then(&orders.1).compare(lhs, rhs),
-        }
-    }
-}
-
-impl Default for SortOrder {
-    fn default() -> Self {
-        Self::Directories.then(Self::Files).then(Self::Name)
-    }
 }
