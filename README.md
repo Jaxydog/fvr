@@ -71,8 +71,10 @@ Arguments:
   -r, --resolve-symlinks        Fully resolve symbolic link paths
 
       --sort <order>            Determines the sorting order of each displayed entry, accepts a comma-separated list
-                                - default: directories,files,name
-                                - options: name, accessed, created, modified, size, files, symlinks, directories, hidden, reverse-*
+                                - default: directory,file,name
+                                - options: name, accessed, created, modified, size, file, symlink, directory, hidden,
+                                    reverse-name, reverse-accessed, reverse-created reverse-modified, reverse-size,
+                                    reverse-file, reverse-symlink, reverse-directory, reverse-hidden
 
 List Arguments:
   -m, --mode <visibility>       Determines if and how the file mode of each entry is displayed
