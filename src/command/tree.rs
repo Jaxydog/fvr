@@ -33,6 +33,7 @@ use crate::section::tree::TreeSection;
 ///
 /// This function will return an error if the command fails.
 pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
+    let should_use_color = arguments.should_enable_color();
     let Some(SubCommand::Tree(tree_arguments)) = arguments.command else { unreachable!() };
 
     let tree_section = TreeSection { max_depth: tree_arguments.max_depth.map_or(usize::MAX, NonZero::get) };
@@ -54,7 +55,6 @@ pub fn invoke(arguments: Arguments) -> std::io::Result<()> {
 
     paths.sort_unstable_with(&arguments.sort_order);
 
-    let should_use_color = arguments.color.should_be_enabled();
     let f = &mut std::io::stdout().lock();
 
     for (index, (path, data)) in paths.into_iter().enumerate() {

@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use carp::{ArgumentOrPositional, Parser};
 
-use self::model::{Arguments, ColorChoice, ListArguments, SubCommand, TreeArguments};
+use self::model::{Arguments, ListArguments, SubCommand, TreeArguments};
 use crate::arguments::model::SortOrderType;
 use crate::exit_codes::{ERROR_CLI_USAGE, ERROR_GENERIC, SUCCESS};
 use crate::section::mode::ModeSection;
@@ -247,9 +247,9 @@ where
     };
 
     arguments.color = match choice {
-        "auto" => ColorChoice::Auto,
-        "always" => ColorChoice::Always,
-        "never" => ColorChoice::Never,
+        "auto" => None,
+        "always" => Some(true),
+        "never" => Some(false),
         v => return Some(self::exit_and_print(ERROR_CLI_USAGE, format_args!("invalid color choice '{v}'"))),
     };
 

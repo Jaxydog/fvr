@@ -34,7 +34,7 @@ pub struct Arguments {
     /// The paths to list.
     pub paths: Vec<Box<Path>>,
     /// Determines whether to output using color.
-    pub color: ColorChoice,
+    pub color: Option<bool>,
     /// Whether to show hidden files.
     pub show_hidden: bool,
     /// Whether to resolve symbolic links.
@@ -49,26 +49,12 @@ pub struct Arguments {
     pub command: Option<SubCommand>,
 }
 
-/// Determines whether to output using color.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ColorChoice {
-    /// Automatically determine whether to output with color.
-    #[default]
-    Auto,
-    /// Always output with color.
-    Always,
-    /// Never output with color.
-    Never,
-}
-
-impl ColorChoice {
-    /// Returns whether or not color should be enabled.
-    #[must_use]
-    pub fn should_be_enabled(self) -> bool {
-        use supports_color::Stream::Stdout;
-        use supports_color::on_cached;
-
-        matches!(self, Self::Always) || (matches!(self, Self::Auto) && on_cached(Stdout).is_some_and(|v| v.has_basic))
+impl Arguments {
+    /// Returns `true` if color should be enabled for the current run.
+    pub fn should_enable_color(&self) -> bool {
+        self.color.unwrap_or_else(|| {
+            supports_color::on_cached(supports_color::Stream::Stdout).is_some_and(|level| level.has_basic)
+        })
     }
 }
 
